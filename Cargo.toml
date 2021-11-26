@@ -1,0 +1,10 @@
+[package]
+name = "cycle_deep_safe_compare"
+version = "0.0.0"
+authors = ["Derick Eddington"]
+license = "Unlicense"
+repository = "https://github.com/DerickEddington/cycle_deep_safe_compare"
+edition = "2021"
+
+[dependencies]
+fastrand = "1"
