@@ -1,15 +1,3 @@
-//! Temp prototype
-
-// Temporary
-#![allow(
-    clippy::missing_docs_in_private_items,
-    clippy::missing_panics_doc,
-    clippy::exhaustive_enums,
-    clippy::missing_inline_in_public_items,
-    clippy::similar_names,
-    clippy::default_numeric_fallback
-)]
-
 use std::{
     cell::{
         Cell,
@@ -87,7 +75,7 @@ impl<DR> Datum<DR>
 //         other: &Self,
 //     ) -> bool
 //     {
-//         precheck_interleave_equal(self, other)
+//         precheck_interleave_equiv(self, other)
 //     }
 // }
 // impl<DR> Eq for Datum<DR>
@@ -123,7 +111,7 @@ impl<T: Deref<Target = Datum<T>> + Clone> DatumRef for T
 }
 
 
-pub fn precheck_interleave_equal<DR: DatumRef>(
+pub fn precheck_interleave_equiv<DR: DatumRef>(
     ar: &DR,
     br: &DR,
 ) -> bool
@@ -531,7 +519,7 @@ mod tests
             other: &Self,
         ) -> bool
         {
-            super::precheck_interleave_equal(self, other)
+            precheck_interleave_equiv(self, other)
         }
     }
 
@@ -708,14 +696,16 @@ mod tests
         check_all(&g, &mut ec);
     }
 
-    #[test]
-    fn precheck_interleave_equal()
+    mod precheck_interleave_equiv
     {
+        use super::*;
         use crate::tests::{
             self,
             make_degenerate_cycle,
             make_degenerate_dag,
+            make_list,
             DEGEN_DAG_TEST_DEPTH,
+            LONG_LIST_TEST_LENGTH,
         };
 
         impl tests::Pair for DatumRc
@@ -746,15 +736,36 @@ mod tests
             }
         }
 
-        assert!(leaf() == leaf());
+        #[test]
+        fn rudimentary()
+        {
+            assert!(leaf() == leaf());
+        }
 
-        let ddag1 = make_degenerate_dag::<DatumRc>(DEGEN_DAG_TEST_DEPTH);
-        let ddag2 = make_degenerate_dag::<DatumRc>(DEGEN_DAG_TEST_DEPTH);
-        // dbg!(&ddag1);
-        assert!(ddag1 == ddag2);
+        #[test]
+        fn degenerate_dag_fast()
+        {
+            let ddag1 = make_degenerate_dag::<DatumRc>(DEGEN_DAG_TEST_DEPTH);
+            let ddag2 = make_degenerate_dag::<DatumRc>(DEGEN_DAG_TEST_DEPTH);
+            // dbg!(&ddag1);
+            assert!(ddag1 == ddag2);
+        }
 
-        let dcyc1 = make_degenerate_cycle::<DatumRc>(1);
-        let dcyc2 = make_degenerate_cycle::<DatumRc>(1);
-        assert!(dcyc1 == dcyc2);
+        #[test]
+        fn degenerate_cycle_works_and_fast()
+        {
+            let dcyc1 = make_degenerate_cycle::<DatumRc>(1);
+            let dcyc2 = make_degenerate_cycle::<DatumRc>(1);
+            assert!(dcyc1 == dcyc2);
+        }
+
+        #[test]
+        #[ignore]
+        fn long_list_stack_overflow()
+        {
+            let list1 = make_list::<DatumRc>(LONG_LIST_TEST_LENGTH);
+            let list2 = make_list::<DatumRc>(LONG_LIST_TEST_LENGTH);
+            assert!(list1 == list2);
+        }
     }
 }
