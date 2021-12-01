@@ -6,5 +6,15 @@ license = "Unlicense"
 repository = "https://github.com/DerickEddington/cycle_deep_safe_compare"
 edition = "2021"
 
+[workspace]
+
 [dependencies]
 fastrand = "1"
+
+[dev-dependencies]
+tests_utils = { path = "tests_utils" }
+
+[[example]]
+name = "derived_eq"
+crate-type = ["lib"]
+test = true

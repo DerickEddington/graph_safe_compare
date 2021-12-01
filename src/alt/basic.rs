@@ -1,20 +1,17 @@
+// TODO(#9): Reorganize into sub modules
+
 use std::{
-    cell::{
-        Cell,
-        Ref,
-        RefCell,
-    },
+    cell::Cell,
     collections::HashMap,
-    hash::{
-        Hash,
-        Hasher,
-    },
-    ops::Deref,
+    hash::Hash,
+    ops::AddAssign,
     ptr,
     rc::Rc,
 };
 
 
+// TODO: These values are from the paper, which is for Scheme.  Other values
+// might be more optimal for this Rust variation?
 const PRE_LIMIT: u16 = 400;
 const FAST_LIMIT: u16 = 2 * PRE_LIMIT;
 #[allow(clippy::integer_division)]
@@ -23,183 +20,226 @@ const SLOW_LIMIT: u16 = PRE_LIMIT / 10;
 const SLOW_LIMIT_NEG: i32 = -(SLOW_LIMIT as i32);
 
 
-#[derive(Debug)]
-pub struct Datum<DR>(RefCell<DatumInner<DR>>);
-
-#[derive(Debug)]
-pub enum DatumInner<DR>
+/// What the main equivalence algorithm needs from a type.
+pub trait Node
 {
-    Leaf,
-    Pair(DR, DR),
-}
+    /// Determines when nodes are the same identical node and so can immediately
+    /// be considered equivalent without checking their values, edges, nor
+    /// descendents.  The size of and methods on this type should be small and
+    /// very cheap.
+    ///
+    /// For types where only nodes that are the same allocation in memory can be
+    /// considered identical, pointer/address equality and hashing should be
+    /// used by defining this type to be [`*const Self`].  (Unfortunately,
+    /// trying to use `&Self` would result in too many difficulties with
+    /// lifetimes.  Using `*const Self` is valid for the equivalence algorithm
+    /// because the lifetimes of the `&Self` borrows for the entry-point
+    /// function calls outlive the raw pointers used internally, and so the
+    /// `Self` objects cannot move during that lifetime and so the pointers
+    /// remain valid.)
+    ///
+    /// For types where different `Self` allocations can represent the same
+    /// identical node, a different implementation must be provided.
+    type Id: Eq + Hash + Clone;
 
-impl<DR> Datum<DR>
-{
-    #[must_use]
-    pub fn leaf() -> Self
-    {
-        Self(RefCell::new(DatumInner::Leaf))
-    }
+    type Index: Eq + Ord + AddAssign + From<u8>;
 
-    #[must_use]
-    pub fn pair(
-        a: DR,
-        b: DR,
-    ) -> Self
-    {
-        Self(RefCell::new(DatumInner::Pair(a, b)))
-    }
+    type Edge: Node<Id = Self::Id>;
 
-    fn inner(&self) -> Ref<'_, DatumInner<DR>>
-    {
-        self.0.borrow()
-    }
+    fn id(&self) -> Self::Id;
 
-    pub fn set(
+    fn amount_edges(&self) -> Self::Index;
+
+    fn get_edge(
         &self,
-        inner: DatumInner<DR>,
-    )
+        idx: &Self::Index,
+    ) -> Self::Edge;
+
+    /// Check if the nodes are equivalent in their own directly-contained values
+    /// ignoring their edges and ignoring their descendent nodes.  This is
+    /// intended to be used by
+    /// [`Self::equiv_modulo_descendents_then_amount_edges`].
+    ///
+    /// TODO: This is not the best most precise statement of the issue.
+    /// For types that do not directly contain values, i.e. when only the
+    /// structure of edges and descendents matters, the implementation should
+    /// just return `true`.
+    fn equiv_modulo_edges(
+        &self,
+        other: &Self,
+    ) -> bool;
+
+    /// Check if the nodes are equivalent in their own directly-contained values
+    /// ignoring their descendent nodes and check if their amounts of edges are
+    /// similar enough that their descendents will need to be checked for
+    /// equivalence.  If both conditions are true, return the amount of edges
+    /// that the main equivalence algorithm should descend, else return `None`.
+    ///
+    /// The implementation must use [`Self::equiv_modulo_edges`] and
+    /// [`Self::amount_edges`] to check the conditions, but it may do so in any
+    /// order.  This allows the implementation to optimize the order to be the
+    /// most efficient for its type.
+    ///
+    /// The implementation must ensure that a `Some(result)` upholds:
+    /// `self.amount_edges() >= result && other.amount_edges() >= result`, so
+    /// that there are enough descendents of each to descend into.
+    ///
+    /// The default implementation checks that `self.amount_edges() ==
+    /// other.amount_edges()` and `self.equiv_modulo_edges(other)`, in that
+    /// order, and, when true, returns the amount of edges.  This is intended
+    /// for types where [`Self::amount_edges`] is cheaper than
+    /// [`Self::equiv_modulo_edges`] and so should be checked first, and where
+    /// the nodes should be considered unequivalent if their amounts of edges
+    /// are not the same, and where all the edges should be descended.  For
+    /// types that do not want all of those aspects, a custom implementation
+    /// will need to be provided, and it must fulfill all the above
+    /// requirements.
+    #[inline]
+    fn equiv_modulo_descendents_then_amount_edges(
+        &self,
+        other: &Self,
+    ) -> Option<Self::Index>
     {
-        *self.0.borrow_mut() = inner;
+        let (az, bz) = (self.amount_edges(), other.amount_edges());
+        (az == bz && self.equiv_modulo_edges(other)).then(|| az)
     }
 }
 
-// TODO?: To have this, would require:
-//          Datum<DR>: Clone
-//          DatumRef::new(Datum<DR>)
-//        Which seems undesirable to require of all users.
-// impl<DR> PartialEq for Datum<DR>
-// {
-//     fn eq(
-//         &self,
-//         other: &Self,
-//     ) -> bool
-//     {
-//         precheck_interleave_equiv(self, other)
-//     }
-// }
-// impl<DR> Eq for Datum<DR>
-// {
-// }
 
-impl<DR: Clone> Clone for Datum<DR>
-{
-    fn clone(&self) -> Self
-    {
-        Self(RefCell::new(self.inner().clone()))
-    }
-}
-
-impl<DR: Clone> Clone for DatumInner<DR>
-{
-    fn clone(&self) -> Self
-    {
-        match self
-        {
-            Self::Leaf => Self::Leaf,
-            Self::Pair(a, b) => Self::Pair(a.clone(), b.clone()),
-        }
-    }
-}
-
-pub trait DatumRef: Deref<Target = Datum<Self>> + Clone + Sized
-{
-}
-
-impl<T: Deref<Target = Datum<T>> + Clone> DatumRef for T
-{
-}
-
-
-pub fn precheck_interleave_equiv<DR: DatumRef>(
-    ar: &DR,
-    br: &DR,
+/// The main equivalence algorithm which can be used for [`PartialEq`]
+/// implementations.  TODO(#10): more about...
+pub fn precheck_interleave_equiv<N: Node + ?Sized>(
+    a: &N,
+    b: &N,
 ) -> bool
 {
-    precheck(ar, br, PRE_LIMIT.into())
-        .map_or(false, |lim| if lim >= 0 { true } else { interleave(ar, br, -1) })
+    match precheck(a, b, PRE_LIMIT.into())
+    {
+        EquivResult::Equiv(_) => true,
+        EquivResult::Unequiv => false,
+        EquivResult::Abort => interleave(a, b, -1),
+    }
 }
 
 
-fn precheck<DR: DatumRef>(
-    ar: &DR,
-    br: &DR,
+fn precheck<N: Node + ?Sized>(
+    a: &N,
+    b: &N,
     limit: i32,
-) -> Option<i32>
+) -> EquivResult
 {
-    equiv(ar, br, limit, |_, _, lim, _| lim >= 0, |a, b, lim, _| precheck(a, b, lim), &mut ())
+    equiv(
+        a,
+        b,
+        limit,
+        |_, _, lim, _| if lim > 0 { DoDescend::Yes } else { DoDescend::NoAbort },
+        |a, b, lim, _| precheck(a, b, lim),
+        &mut (),
+    )
 }
 
 
+enum DoDescend
+{
+    Yes,
+    NoContinue(i32),
+    NoAbort,
+}
+
+#[derive(PartialEq, Eq, Debug)]
+enum EquivResult
+{
+    Unequiv,
+    Abort,
+    Equiv(i32),
+}
+
+// TODO(#1): Might be cleaner to instead have a trait for this with methods instead
+// of passing the closures, and the different uses can impl that for their own
+// internal types.
 fn equiv<
-    DR: DatumRef,
-    D: FnMut(&DR, &DR, i32, &mut S) -> bool,
-    R: FnMut(&DR, &DR, i32, &mut S) -> Option<i32>,
+    N: Node + ?Sized,
+    D: FnMut(&N, &N, i32, &mut S) -> DoDescend,
+    R: FnMut(&N::Edge, &N::Edge, i32, &mut S) -> EquivResult,
     S,
 >(
-    ar: &DR,
-    br: &DR,
+    a: &N,
+    b: &N,
     mut limit: i32,
     mut do_descend: D,
     mut recur: R,
     state: &mut S,
-) -> Option<i32>
+) -> EquivResult
 {
-    let (ad, bd): (&Datum<DR>, &Datum<DR>) = (&**ar, &**br);
+    use EquivResult::{
+        Abort,
+        Equiv,
+        Unequiv,
+    };
 
-    if ptr::eq(ad, bd)
+    if a.id() == b.id()
     {
-        Some(limit)
+        Equiv(limit)
+    }
+    else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b)
+    {
+        let mut i = 0.into();
+
+        if i < amount_edges
+        {
+            match do_descend(a, b, limit, state)
+            {
+                DoDescend::Yes =>
+                {
+                    while i < amount_edges
+                    {
+                        let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
+
+                        limit = limit.saturating_sub(1);
+
+                        match recur(&ae, &be, limit, state)
+                        {
+                            Equiv(lim) => limit = lim,
+                            result @ (Unequiv | Abort) => return result,
+                        }
+
+                        i += 1.into();
+                    }
+                },
+                DoDescend::NoContinue(lim) => limit = lim,
+                DoDescend::NoAbort => return Abort,
+            }
+        }
+
+        Equiv(limit)
     }
     else
     {
-        #[allow(clippy::enum_glob_use)]
-        use DatumInner::*;
-
-        let (ai, bi): (&DatumInner<DR>, &DatumInner<DR>) = (&*ar.inner(), &*br.inner());
-
-        match (ai, bi)
-        {
-            (Leaf, Leaf) => Some(limit),
-
-            (Pair(ap0, ap1), Pair(bp0, bp1)) =>
-            {
-                limit = limit.saturating_sub(1);
-
-                if do_descend(ar, br, limit, state)
-                {
-                    recur(ap0, bp0, limit, state).and_then(|lim| recur(ap1, bp1, lim, state))
-                }
-                else
-                {
-                    Some(limit)
-                }
-            },
-
-            (_, _) => None,
-        }
+        Unequiv
     }
 }
 
 
-fn interleave<DR: DatumRef>(
-    ar: &DR,
-    br: &DR,
+// TODO(#2): Could this be refactored to be cleaner. Hopefully refactoring equiv
+// per above will help do that for this.
+fn interleave<N: Node + ?Sized>(
+    a: &N,
+    b: &N,
     limit: i32,
 ) -> bool
 {
-    fn slow_or_fast<DR: DatumRef>(
-        ar: &DR,
-        br: &DR,
+    fn slow_or_fast<N: Node + ?Sized>(
+        a: &N,
+        b: &N,
         limit: i32,
-        equiv_classes: &mut EquivClasses<DR>,
-    ) -> Option<i32>
+        equiv_classes: &mut EquivClasses<N::Id>,
+    ) -> EquivResult
     {
         if limit < 0
         {
-            if limit > SLOW_LIMIT_NEG
+            if limit >= SLOW_LIMIT_NEG
             {
-                slow(ar, br, limit, equiv_classes)
+                slow(a, b, limit, equiv_classes)
             }
             else
             {
@@ -208,87 +248,66 @@ fn interleave<DR: DatumRef>(
                     fastrand::i32(0 ..= max.into())
                 }
 
-                fast(ar, br, rand_limit(FAST_LIMIT), equiv_classes)
+                fast(a, b, rand_limit(FAST_LIMIT), equiv_classes)
             }
         }
         else
         {
-            fast(ar, br, limit, equiv_classes)
+            fast(a, b, limit, equiv_classes)
         }
     }
 
-    fn slow<DR: DatumRef>(
-        ar: &DR,
-        br: &DR,
+    fn slow<N: Node + ?Sized>(
+        a: &N,
+        b: &N,
         limit: i32,
-        equiv_classes: &mut EquivClasses<DR>,
-    ) -> Option<i32>
+        equiv_classes: &mut EquivClasses<N::Id>,
+    ) -> EquivResult
     {
         equiv(
-            ar,
-            br,
+            a,
+            b,
             limit,
-            |a, b, _, eqv_cls| !eqv_cls.same_class(a, b),
+            |a, b, _, eqv_cls| {
+                if eqv_cls.same_class(&a.id(), &b.id())
+                {
+                    // This is what prevents traversing descendents that have
+                    // already been checked, which prevents infinite loops on
+                    // cycles and is more efficient on shared structure.  Reset
+                    // the counter so that `slow` will be used for longer, on
+                    // the theory that further equivalences in descendents are
+                    // more likely since we found an equivalence (which is
+                    // critical for avoiding stack overflow with shapes like
+                    // "degenerate cyclic".).
+                    DoDescend::NoContinue(-1)
+                }
+                else
+                {
+                    DoDescend::Yes
+                }
+            },
             slow_or_fast,
             equiv_classes,
         )
     }
 
-    fn fast<DR: DatumRef>(
-        ar: &DR,
-        br: &DR,
+    fn fast<N: Node + ?Sized>(
+        a: &N,
+        b: &N,
         limit: i32,
-        equiv_classes: &mut EquivClasses<DR>,
-    ) -> Option<i32>
+        equiv_classes: &mut EquivClasses<N::Id>,
+    ) -> EquivResult
     {
-        equiv(ar, br, limit, |_, _, _, _| true, slow_or_fast, equiv_classes)
+        equiv(a, b, limit, |_, _, _, _| DoDescend::Yes, slow_or_fast, equiv_classes)
     }
 
-    slow_or_fast(ar, br, limit, &mut EquivClasses::new()).is_some()
+    matches!(slow_or_fast(a, b, limit, &mut EquivClasses::new()), EquivResult::Equiv(_))
 }
 
 
-struct EquivClasses<DR>
+struct EquivClasses<Key>
 {
-    map: HashMap<DatumRefKey<DR>, Rc<Cell<EquivClassChain>>>,
-}
-
-struct DatumRefKey<DR>(DR);
-
-impl<DR: DatumRef> PartialEq for DatumRefKey<DR>
-{
-    fn eq(
-        &self,
-        other: &Self,
-    ) -> bool
-    {
-        let (ar, br): (&Datum<DR>, &Datum<DR>) = (&*self.0, &*other.0);
-        ptr::eq(ar, br)
-    }
-}
-impl<DR: DatumRef> Eq for DatumRefKey<DR>
-{
-}
-
-impl<DR: DatumRef> Hash for DatumRefKey<DR>
-{
-    fn hash<H: Hasher>(
-        &self,
-        state: &mut H,
-    )
-    {
-        let r: &Datum<DR> = &*self.0;
-        let ptr: *const Datum<DR> = r;
-        ptr.hash(state);
-    }
-}
-
-impl<DR: Clone> From<&DR> for DatumRefKey<DR>
-{
-    fn from(r: &DR) -> Self
-    {
-        Self(r.clone())
-    }
+    map: HashMap<Key, Rc<Cell<EquivClassChain>>>,
 }
 
 #[derive(Clone)]
@@ -338,6 +357,9 @@ impl EquivClassChain
         Rc::new(Cell::new(Self::End(rep)))
     }
 
+    /// This type uses `Cell`, instead of `RefCell`, so that panics are
+    /// impossible, which requires the approach of this function because our
+    /// type cannot be `Copy`.
     fn clone_inner(it: &Rc<Cell<Self>>) -> Self
     {
         let dummy = Self::Next(Rc::clone(it));
@@ -377,7 +399,7 @@ impl EquivClassChain
     }
 }
 
-impl<DR: DatumRef> EquivClasses<DR>
+impl<K: Eq + Hash + Clone> EquivClasses<K>
 {
     fn new() -> Self
     {
@@ -386,27 +408,25 @@ impl<DR: DatumRef> EquivClasses<DR>
 
     fn none_seen(
         &mut self,
-        ar: &DR,
-        br: &DR,
+        ak: &K,
+        bk: &K,
     )
     {
-        let (ak, bk): (DatumRefKey<DR>, DatumRefKey<DR>) = (ar.into(), br.into());
         let aec = EquivClassChain::default();
         let bec = Rc::clone(&aec);
-        let _ignored1 = self.map.insert(ak, aec);
-        let _ignored2 = self.map.insert(bk, bec);
+        let _ignored1 = self.map.insert(ak.clone(), aec);
+        let _ignored2 = self.map.insert(bk.clone(), bec);
     }
 
     fn some_seen(
         &mut self,
         oec: &Rc<Cell<EquivClassChain>>,
-        r: &DR,
+        k: &K,
     )
     {
-        let rk: DatumRefKey<DR> = r.into();
         let rep = EquivClassChain::rep_of(oec);
         let ec = EquivClassChain::new(rep);
-        let _ignored = self.map.insert(rk, ec);
+        let _ignored = self.map.insert(k.clone(), ec);
     }
 
     fn all_seen(
@@ -446,30 +466,27 @@ impl<DR: DatumRef> EquivClasses<DR>
 
     fn same_class(
         &mut self,
-        ar: &DR,
-        br: &DR,
+        ak: &K,
+        bk: &K,
     ) -> bool
     {
-        let (ak, bk): (&DatumRefKey<DR>, &DatumRefKey<DR>) = (&ar.into(), &br.into());
-
         match (self.map.get(ak), self.map.get(bk))
         {
-            #![allow(clippy::shadow_reuse)]
             (None, None) =>
             {
-                self.none_seen(ar, br);
+                self.none_seen(ak, bk);
                 false
             },
             (Some(aec), None) =>
             {
                 let aec = &Rc::clone(aec); // To end borrow of `self`.
-                self.some_seen(aec, br);
+                self.some_seen(aec, bk);
                 false
             },
             (None, Some(bec)) =>
             {
                 let bec = &Rc::clone(bec); // To end borrow of `self`.
-                self.some_seen(bec, ar);
+                self.some_seen(bec, ak);
                 false
             },
             (Some(aec), Some(bec)) => Self::all_seen(aec, bec),
@@ -481,128 +498,99 @@ impl<DR: DatumRef> EquivClasses<DR>
 #[cfg(test)]
 mod tests
 {
-    use std::collections::hash_map::DefaultHasher;
-
     use super::*;
 
-    #[derive(Clone)]
-    struct RcDatum(Datum<DatumRc>);
-    #[derive(Clone, Eq)]
-    struct DatumRc(Rc<RcDatum>);
-
-    impl PartialEq for RcDatum
+    enum Datum
     {
-        fn eq(
-            &self,
-            other: &Self,
-        ) -> bool
-        {
-            DatumRc::eq(&self.into(), &other.into())
-        }
-    }
-    impl Eq for RcDatum
-    {
+        Leaf,
+        Pair(Box<Self>, Box<Self>),
     }
 
-    impl From<&RcDatum> for DatumRc
+    fn leaf() -> Datum
     {
-        fn from(d: &RcDatum) -> Self
-        {
-            Self(Rc::new(d.clone()))
-        }
-    }
-
-    impl PartialEq for DatumRc
-    {
-        fn eq(
-            &self,
-            other: &Self,
-        ) -> bool
-        {
-            precheck_interleave_equiv(self, other)
-        }
-    }
-
-    impl Deref for DatumRc
-    {
-        type Target = Datum<Self>;
-
-        fn deref(&self) -> &Self::Target
-        {
-            &(*self.0).0
-        }
-    }
-
-    fn leaf() -> DatumRc
-    {
-        DatumRc(Rc::new(RcDatum(Datum::leaf())))
+        Datum::Leaf
     }
 
     fn pair(
-        a: DatumRc,
-        b: DatumRc,
-    ) -> DatumRc
+        a: Datum,
+        b: Datum,
+    ) -> Datum
     {
-        DatumRc(Rc::new(RcDatum(Datum::pair(a, b))))
+        Datum::Pair(Box::new(a), Box::new(b))
     }
 
-    fn end_pair() -> DatumRc
+    fn end_pair() -> Datum
     {
         pair(leaf(), leaf())
+    }
+
+    impl Node for &Datum
+    {
+        type Edge = Self;
+        type Id = *const Datum;
+        type Index = u8;
+
+        fn id(&self) -> Self::Id
+        {
+            *self
+        }
+
+        fn amount_edges(&self) -> Self::Index
+        {
+            match self
+            {
+                Datum::Leaf => 0,
+                Datum::Pair(_, _) => 2,
+            }
+        }
+
+        fn get_edge(
+            &self,
+            idx: &Self::Index,
+        ) -> Self::Edge
+        {
+            match (idx, self)
+            {
+                #![allow(clippy::panic)]
+                (0, Datum::Pair(a, _)) => a,
+                (1, Datum::Pair(_, b)) => b,
+                _ => panic!("invalid"),
+            }
+        }
+
+        fn equiv_modulo_edges(
+            &self,
+            _other: &Self,
+        ) -> bool
+        {
+            true
+        }
     }
 
     #[test]
     fn precheck_basic()
     {
-        assert_eq!(precheck(&leaf(), &leaf(), 42), Some(42));
-        assert_eq!(precheck(&leaf(), &leaf(), -1), Some(-1));
-        assert_eq!(precheck(&leaf(), &end_pair(), 42), None);
-        assert_eq!(precheck(&end_pair(), &leaf(), 42), None);
-        assert_eq!(precheck(&end_pair(), &end_pair(), 7), Some(6));
-        assert_eq!(precheck(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 7), Some(5));
-        assert_eq!(precheck(&end_pair(), &end_pair(), 0), Some(-1));
-        assert_eq!(precheck(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 1), Some(-1));
+        use EquivResult::{
+            Abort,
+            Equiv,
+            Unequiv,
+        };
+
+        assert_eq!(precheck(&&leaf(), &&leaf(), 42), Equiv(42));
+        assert_eq!(precheck(&&leaf(), &&leaf(), -1), Equiv(-1));
+        assert_eq!(precheck(&&leaf(), &&end_pair(), 42), Unequiv);
+        assert_eq!(precheck(&&end_pair(), &&leaf(), 42), Unequiv);
+        assert_eq!(precheck(&&end_pair(), &&end_pair(), 7), Equiv(5));
+        assert_eq!(precheck(&&pair(leaf(), end_pair()), &&pair(leaf(), end_pair()), 7), Equiv(3));
+        assert_eq!(precheck(&&end_pair(), &&end_pair(), 0), Abort);
+        assert_eq!(precheck(&&pair(leaf(), end_pair()), &&pair(leaf(), end_pair()), 1), Abort);
         assert_eq!(
             {
                 let x = pair(end_pair(), leaf());
-                precheck(&x, &x, 0)
+                precheck(&&x, &&x, 0)
             },
-            Some(0)
+            Equiv(0)
         );
-    }
-
-    #[test]
-    fn datum_ref_key()
-    {
-        fn hash(d: &DatumRefKey<DatumRc>) -> u64
-        {
-            let mut hasher = DefaultHasher::new();
-            d.hash(&mut hasher);
-            hasher.finish()
-        }
-
-        {
-            #![allow(clippy::eq_op)]
-            let l = leaf();
-            let dr = DatumRefKey(l);
-            assert!(dr == dr);
-            assert_eq!(hash(&dr), hash(&dr));
-        };
-        {
-            let d1 = leaf();
-            let d2 = d1.clone();
-            let dr1 = DatumRefKey(d1);
-            let dr2 = DatumRefKey(d2);
-            assert!(dr1 == dr2);
-            assert_eq!(hash(&dr1), hash(&dr2));
-        };
-        {
-            let d1 = leaf();
-            let d2 = leaf();
-            let dr1 = DatumRefKey(d1);
-            let dr2 = DatumRefKey(d2);
-            assert!(dr1 != dr2);
-        };
     }
 
     #[test]
@@ -656,116 +644,31 @@ mod tests
     #[test]
     fn same_class()
     {
-        fn p() -> DatumRc
-        {
-            pair(leaf(), leaf())
-        }
-
-        fn check_all(
-            g: &[DatumRc],
-            ec: &mut EquivClasses<DatumRc>,
-        )
-        {
-            for a in g
-            {
-                for b in g
-                {
-                    assert!(ec.same_class(a, b));
-                }
-            }
-        }
-
         let mut ec = EquivClasses::new();
-        let g = [p(), p(), p(), p(), p(), p()];
+        let keys = ['a', 'b', 'c', 'd', 'e', 'f'];
 
-        assert!(!ec.same_class(&g[0], &g[1]));
-        assert!(ec.same_class(&g[0], &g[1]));
+        assert!(!ec.same_class(&keys[0], &keys[1]));
+        assert!(ec.same_class(&keys[0], &keys[1]));
 
-        assert!(!ec.same_class(&g[0], &g[2]));
-        assert!(ec.same_class(&g[0], &g[2]));
-        assert!(ec.same_class(&g[1], &g[2]));
+        assert!(!ec.same_class(&keys[0], &keys[2]));
+        assert!(ec.same_class(&keys[0], &keys[2]));
+        assert!(ec.same_class(&keys[1], &keys[2]));
 
-        assert!(!ec.same_class(&g[3], &g[2]));
-        assert!(ec.same_class(&g[3], &g[2]));
-        assert!(ec.same_class(&g[3], &g[1]));
-        assert!(ec.same_class(&g[3], &g[0]));
+        assert!(!ec.same_class(&keys[3], &keys[2]));
+        assert!(ec.same_class(&keys[3], &keys[2]));
+        assert!(ec.same_class(&keys[3], &keys[1]));
+        assert!(ec.same_class(&keys[3], &keys[0]));
 
-        assert!(!ec.same_class(&g[4], &g[5]));
-        assert!(ec.same_class(&g[4], &g[5]));
-        assert!(!ec.same_class(&g[1], &g[4]));
-        check_all(&g, &mut ec);
-    }
+        assert!(!ec.same_class(&keys[4], &keys[5]));
+        assert!(ec.same_class(&keys[4], &keys[5]));
+        assert!(!ec.same_class(&keys[1], &keys[4]));
 
-    mod precheck_interleave_equiv
-    {
-        use super::*;
-        use crate::tests::{
-            self,
-            make_degenerate_cycle,
-            make_degenerate_dag,
-            make_list,
-            DEGEN_DAG_TEST_DEPTH,
-            LONG_LIST_TEST_LENGTH,
-        };
-
-        impl tests::Pair for DatumRc
+        for a in &keys
         {
-            fn new(
-                a: Self,
-                b: Self,
-            ) -> Self
+            for b in &keys
             {
-                pair(a, b)
+                assert!(ec.same_class(a, b));
             }
-
-            fn set(
-                &self,
-                a: Self,
-                b: Self,
-            )
-            {
-                self.0.0.set(DatumInner::Pair(a, b));
-            }
-        }
-
-        impl tests::Leaf for DatumRc
-        {
-            fn new() -> Self
-            {
-                leaf()
-            }
-        }
-
-        #[test]
-        fn rudimentary()
-        {
-            assert!(leaf() == leaf());
-        }
-
-        #[test]
-        fn degenerate_dag_fast()
-        {
-            let ddag1 = make_degenerate_dag::<DatumRc>(DEGEN_DAG_TEST_DEPTH);
-            let ddag2 = make_degenerate_dag::<DatumRc>(DEGEN_DAG_TEST_DEPTH);
-            // dbg!(&ddag1);
-            assert!(ddag1 == ddag2);
-        }
-
-        #[test]
-        fn degenerate_cycle_works_and_fast()
-        {
-            let dcyc1 = make_degenerate_cycle::<DatumRc>(1);
-            let dcyc2 = make_degenerate_cycle::<DatumRc>(1);
-            assert!(dcyc1 == dcyc2);
-        }
-
-        #[test]
-        #[ignore]
-        fn long_list_stack_overflow()
-        {
-            let list1 = make_list::<DatumRc>(LONG_LIST_TEST_LENGTH);
-            let list2 = make_list::<DatumRc>(LONG_LIST_TEST_LENGTH);
-            assert!(list1 == list2);
         }
     }
 }

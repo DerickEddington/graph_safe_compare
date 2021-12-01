@@ -30,7 +30,7 @@
     trivial_casts,
     trivial_numeric_casts,
     unreachable_pub,
-    unused_crate_dependencies,
+    // unused_crate_dependencies, // annoying hits for dev-dependencies
     unused_extern_crates,
     unused_import_braces,
     unused_lifetimes,
@@ -94,7 +94,3 @@ pub mod alt
     /// - TODO?: Optionally giving a custom allocator?
     pub mod basic;
 }
-
-
-#[cfg(test)]
-mod tests;
