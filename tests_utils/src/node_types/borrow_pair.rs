@@ -1,9 +1,6 @@
-use std::{
-    cell::{
-        Cell,
-        RefCell,
-    },
-    iter::repeat,
+use std::cell::{
+    Cell,
+    RefCell,
 };
 
 use crate::shapes::{
@@ -67,12 +64,12 @@ pub struct DatumAllocator<D>
     next:  Cell<usize>,
 }
 
-impl<D: Default + Clone> DatumAllocator<D>
+impl<D: Default> DatumAllocator<D>
 {
     pub fn new(size: usize) -> Self
     {
-        let datum = D::default();
-        let vec: Vec<_> = repeat(datum).take(size).collect();
+        let mut vec = Vec::with_capacity(size);
+        vec.resize_with(size, D::default);
         Self { slice: vec.into_boxed_slice(), next: Cell::new(0) }
     }
 }
