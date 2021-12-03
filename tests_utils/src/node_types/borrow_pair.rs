@@ -74,7 +74,7 @@ impl<D: Default> DatumAllocator<D>
     }
 }
 
-impl<'a, D: 'a> Allocator<&'a D> for &'a DatumAllocator<D>
+impl<'a, D> Allocator<&'a D> for &'a DatumAllocator<D>
 {
     fn alloc(&self) -> &'a D
     {
