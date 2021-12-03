@@ -51,7 +51,7 @@ pub trait Pair: Leaf
 
 pub struct PairChainMaker<A, T>
 {
-    depth: usize,
+    depth: u32,
     alloc: A,
     head:  T,
     tail:  T,
@@ -60,7 +60,7 @@ pub struct PairChainMaker<A, T>
 impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
 {
     pub fn new_with(
-        depth: usize,
+        depth: u32,
         alloc: A,
     ) -> Self
     {
@@ -69,7 +69,7 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
         Self { depth, alloc, head, tail }
     }
 
-    pub fn new(depth: usize) -> Self
+    pub fn new(depth: u32) -> Self
     where
         A: Default,
     {

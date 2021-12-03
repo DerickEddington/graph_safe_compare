@@ -16,7 +16,7 @@ use crate::shapes::{
 // algorithms are tested against this type, their functions must be called
 // directly.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct Datum(RefCell<Option<(Rc<Self>, Rc<Self>)>>);
+pub struct Datum(pub RefCell<Option<(Rc<Self>, Rc<Self>)>>);
 
 impl Leaf for Rc<Datum>
 {
@@ -48,6 +48,14 @@ impl Allocator<Rc<Datum>> for DatumAllocator
     fn alloc(&self) -> Rc<Datum>
     {
         Rc::new(Datum(RefCell::new(None)))
+    }
+}
+
+impl DatumAllocator
+{
+    pub fn new(_size: u32) -> Self
+    {
+        Self::default()
     }
 }
 

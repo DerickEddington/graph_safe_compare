@@ -61,13 +61,14 @@ impl<'l> Pair for &'l Datum<'l>
 pub struct DatumAllocator<D>
 {
     slice: Box<[D]>,
-    next:  Cell<usize>,
+    next:  Cell<u32>,
 }
 
 impl<D: Default> DatumAllocator<D>
 {
-    pub fn new(size: usize) -> Self
+    pub fn new(size: u32) -> Self
     {
+        let size = size.try_into().unwrap();
         let mut vec = Vec::with_capacity(size);
         vec.resize_with(size, D::default);
         Self { slice: vec.into_boxed_slice(), next: Cell::new(0) }
@@ -80,6 +81,7 @@ impl<'a, D> Allocator<&'a D> for &'a DatumAllocator<D>
     {
         let i = self.next.get();
         self.next.set(i + 1);
+        let i: usize = i.try_into().unwrap();
         &self.slice[i]
     }
 }
