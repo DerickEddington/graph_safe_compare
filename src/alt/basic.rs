@@ -28,59 +28,139 @@ pub trait Node
     /// descendents.  The size of and methods on this type should be small and
     /// very cheap.
     ///
-    /// For types where only nodes that are the same allocation in memory can be
+    /// For types where only nodes that are the same object in memory can be
     /// considered identical, pointer/address equality and hashing should be
-    /// used by defining this type to be [`*const Self`].  (Unfortunately,
-    /// trying to use `&Self` would result in too many difficulties with
-    /// lifetimes.  Using `*const Self` is valid for the equivalence algorithm
-    /// because the lifetimes of the `&Self` borrows for the entry-point
-    /// function calls outlive the raw pointers used internally, and so the
-    /// `Self` objects cannot move during that lifetime and so the pointers
-    /// remain valid.)
+    /// used by defining this type to be `*const T` where `T` is either `Self`
+    /// or the primary inner type.  Such pointers are never dereferenced, and so
+    /// there is no `unsafe` usage.  (Unfortunately, trying to use `&T` would
+    /// cause too many difficulties with lifetimes.  Using `*const T` is valid
+    /// for the algorithm because the lifetimes of the `&Self` borrows for the
+    /// entry-point [`precheck_interleave_equiv`] function calls outlive such
+    /// pointers used internally, and so the `Self` objects cannot move during
+    /// those lifetimes and so the pointers remain valid.)
     ///
-    /// For types where different `Self` allocations can represent the same
-    /// identical node, a different implementation must be provided.
+    /// For other types where different `Self` objects can represent the same
+    /// identical node, some approach following that should be provided, and the
+    /// pointer/address approach should not be used.
     type Id: Eq + Hash + Clone;
 
+    /// Determines what is used to index descendent nodes and to represent the
+    /// amount of them.  The primitive unsigned integer types, like `usize`, are
+    /// a common choice, but it may be anything that satisfies the trait bounds.
+    ///
+    /// Only `Self::Index::from(0)`, `Self::Index::from(1)`, and
+    /// `Self::Index::add_assign(index, 1.into())` are actually used by the
+    /// algorithm, and so the type does not actually have to support `From<u8>`
+    /// for the rest of the `u8` range, and does not actually have to support
+    /// `AddAssign` of increments other than the unit value nor of results
+    /// beyond the maximum possible amount of edges.
+    ///
+    /// E.g. for graphs with nodes whose amounts of edges are always smaller
+    /// than some limit, it might be desirable, for efficiency, to use an index
+    /// type smaller than `usize`.  Or for other node types, it might be more
+    /// logical or convenient to use an index type that is not a number.
     type Index: Eq + Ord + AddAssign + From<u8>;
 
+    /// The descendent node type may be the same as `Self` or may be different
+    /// as long as the [`Id`](Node::Id) type is the same.
     type Edge: Node<Id = Self::Id>;
 
+    /// Get the identity of the `self` node.  The result must only be `==` to
+    /// another node's when the nodes should be considered identical.
     fn id(&self) -> Self::Id;
 
+    /// Determines how many edges the `self` node has that the algorithm will
+    /// descend into and check.  All indices in the range `0.into()
+    /// .. self.amount_edges()` must be valid to call
+    /// [`self.get_edge(index)`](Self::get_edge) with.
     fn amount_edges(&self) -> Self::Index;
 
+    /// Get descendent node by index.  The index must be within the range
+    /// `0.into() .. self.amount_edges()`.  The algorithm calls this method, for
+    /// each index in that range, to descend into each edge.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the index is out of bounds.  But since the same implementor
+    /// controls [`Self::amount_edges`], and when that is implemented correctly,
+    /// as it must be, then such out-of-bounds panics are impossible, as used by
+    /// the algorithm.
     fn get_edge(
         &self,
-        idx: &Self::Index,
+        index: &Self::Index,
     ) -> Self::Edge;
 
-    /// Check if the nodes are equivalent in their own directly-contained values
-    /// ignoring their edges and ignoring their descendent nodes.  This is
-    /// intended to be used by
+    /// Check if the nodes are equivalent in their own directly-contained
+    /// semantically-significant values ignoring their edges and ignoring their
+    /// descendent nodes.  This is intended to be used by
     /// [`Self::equiv_modulo_descendents_then_amount_edges`].
     ///
-    /// TODO: This is not the best most precise statement of the issue.
-    /// For types that do not directly contain values, i.e. when only the
-    /// structure of edges and descendents matters, the implementation should
-    /// just return `true`.
+    /// E.g. a node type like:
+    ///
+    /// ```rust
+    /// struct My {
+    ///   value: i32,
+    ///   next: Box<My>,
+    /// }
+    /// ```
+    ///
+    /// Requires that the implementor decide whether the value of the `value`
+    /// field should affect equivalence.  Either way is supported.  The
+    /// implementor could decide to always return `true` to ignore the field and
+    /// allow the algorithm to just compare the descendent, or the implementor
+    /// could make the result correspond to whether the values of the field are
+    /// the same or not.
+    ///
+    /// Or, e.g. a node type like:
+    ///
+    /// ```rust
+    /// enum My {
+    ///   A(Box<My>, Box<My>),
+    ///   B(Box<My>, Box<My>),
+    /// }
+    /// ```
+    ///
+    /// Requires that the implementor decide whether the difference between the
+    /// `A` and `B` variants should affect equivalence.  Either way is
+    /// supported.  Since both variants have the same amount of edges (assuming
+    /// [`Self::amount_edges`] is implemented like that), the implementor could
+    /// decide to always return `true` to ignore differences in the variants and
+    /// allow the algorithm to just compare the descendents, or the implementor
+    /// could make the result correspond to whether the variants are the same or
+    /// not.
+    ///
+    /// Or, e.g. a node type like:
+    ///
+    /// ```rust
+    /// enum My {
+    ///   A,
+    ///   B(Box<My>),
+    /// }
+    /// ```
+    ///
+    /// It is sufficient to always return `true`, when [`Self::amount_edges`]
+    /// returns `0.into()` for the `A` variant or `1.into()` for the `B`
+    /// variant, because this is used by
+    /// [`Self::equiv_modulo_descendents_then_amount_edges`] and the algorithm
+    /// will detect the unequivalence that way instead.
     fn equiv_modulo_edges(
         &self,
         other: &Self,
     ) -> bool;
 
-    /// Check if the nodes are equivalent in their own directly-contained values
-    /// ignoring their descendent nodes and check if their amounts of edges are
-    /// similar enough that their descendents will need to be checked for
-    /// equivalence.  If both conditions are true, return the amount of edges
-    /// that the main equivalence algorithm should descend, else return `None`.
+    /// Check if the nodes are equivalent in their own directly-contained
+    /// semantically-significant values ignoring their descendent nodes and
+    /// check if their amounts of edges are similar enough that their
+    /// descendents will need to be checked for equivalence.  If both conditions
+    /// are true, return the amount of edges that the algorithm should descend,
+    /// else return `None`.
     ///
-    /// The implementation must use [`Self::equiv_modulo_edges`] and
-    /// [`Self::amount_edges`] to check the conditions, but it may do so in any
+    /// The implementor must use [`Self::equiv_modulo_edges`] and
+    /// [`Self::amount_edges`] to check the conditions, but may do so in any
     /// order.  This allows the implementation to optimize the order to be the
     /// most efficient for its type.
     ///
-    /// The implementation must ensure that a `Some(result)` upholds:
+    /// The implementor must ensure that a `Some(result)` upholds:
     /// `self.amount_edges() >= result && other.amount_edges() >= result`, so
     /// that there are enough descendents of each to descend into.
     ///

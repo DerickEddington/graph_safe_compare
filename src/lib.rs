@@ -86,11 +86,11 @@ pub mod alt
 {
     /// Variation that uses the normal function call stack, and so cannot handle
     /// very-deep graphs because stack overflow can happen, and that does not
-    /// load/unload nodes, and so cannot handle graphs larger than available
-    /// memory.  For inputs that are not too deep and that can fit in memory at
-    /// once, this is faster (TODO: benchmarks to confirm).  It supports:
-    /// - Graphs: cyclic, directed-acyclic, degenerate, tree.
-    /// - Generic node types.
-    /// - TODO?: Optionally giving a custom allocator?
+    /// load/unload nodes (TODO: actually it might be possible to load/unload),
+    /// and so cannot handle graphs larger than available memory.  For inputs
+    /// that are not too deep and that can fit in memory at once, this is faster
+    /// (TODO: benchmarks to confirm).  It supports: - Graphs: cyclic,
+    /// directed-acyclic, degenerate, tree.  - Generic node types.  - TODO?:
+    /// Optionally giving a custom allocator?
     pub mod basic;
 }
