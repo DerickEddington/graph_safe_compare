@@ -10,6 +10,9 @@ pub mod node_types
 {
     pub mod borrow_pair;
     pub mod rc_pair;
+    pub mod dyn_pair;
+    pub mod diff_edge;
+    pub mod diff_index;
 }
 
 pub mod shapes;
