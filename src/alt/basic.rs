@@ -4,6 +4,7 @@ use std::{
     cell::Cell,
     collections::HashMap,
     hash::Hash,
+    marker::PhantomData,
     ops::AddAssign,
     ptr,
     rc::Rc,
@@ -194,7 +195,7 @@ pub fn precheck_interleave_equiv<N: Node + ?Sized>(
 ) -> bool
 {
     match precheck(a, b, PRE_LIMIT.into()) {
-        EquivResult::Equiv(_) => true,
+        EquivResult::Equiv => true,
         EquivResult::Unequiv => false,
         EquivResult::Abort => interleave(a, b, -1),
     }
@@ -207,167 +208,167 @@ fn precheck<N: Node + ?Sized>(
     limit: i32,
 ) -> EquivResult
 {
-    equiv(
-        a,
-        b,
-        limit,
-        |_, _, lim, _| if lim > 0 { DoDescend::Yes } else { DoDescend::NoAbort },
-        |ae, be, lim, _| precheck(ae, be, lim),
-        &mut (),
-    )
+    struct Precheck<I>(PhantomData<I>);
+
+    impl<I> EquivControl for Equiv<Precheck<I>>
+    {
+        type Id = I;
+
+        fn do_descend<N: Node<Id = Self::Id> + ?Sized>(
+            &mut self,
+            _a: &N,
+            _b: &N,
+        ) -> DoDescend
+        {
+            if self.limit > 0 { DoDescend::Yes } else { DoDescend::NoAbort }
+        }
+    }
+
+    let mut e = Equiv { limit, state: Precheck(PhantomData) };
+    e.equiv(a, b)
 }
 
 
 enum DoDescend
 {
     Yes,
-    NoContinue(i32),
+    NoContinue,
     NoAbort,
 }
 
-#[derive(PartialEq, Eq, Debug)]
 enum EquivResult
 {
     Unequiv,
     Abort,
-    Equiv(i32),
+    Equiv,
 }
 
-// TODO(#1): Might be cleaner to instead have a trait for this with methods instead
-// of passing the closures, and the different uses can impl that for their own
-// internal types.
-fn equiv<
-    N: Node + ?Sized,
-    D: FnMut(&N, &N, i32, &mut S) -> DoDescend,
-    R: FnMut(&N::Edge, &N::Edge, i32, &mut S) -> EquivResult,
-    S,
->(
-    a: &N,
-    b: &N,
-    mut limit: i32,
-    mut do_descend: D,
-    mut recur: R,
-    state: &mut S,
-) -> EquivResult
+trait EquivControl
 {
-    use {
-        DoDescend::{
-            NoAbort,
-            NoContinue,
-            Yes,
-        },
-        EquivResult::{
-            Abort,
-            Equiv,
-            Unequiv,
-        },
-    };
+    type Id;
 
-    if a.id() == b.id() {
-        Equiv(limit)
-    }
-    else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b) {
-        let mut i = 0.into();
-        if i < amount_edges {
-            match do_descend(a, b, limit, state) {
-                Yes =>
-                    while i < amount_edges {
-                        let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
-                        limit = limit.saturating_sub(1);
-                        match recur(&ae, &be, limit, state) {
-                            Equiv(lim) => limit = lim,
-                            result @ (Unequiv | Abort) => return result,
-                        }
-                        i += 1.into();
-                    },
-                NoContinue(lim) => limit = lim,
-                NoAbort => return Abort,
-            }
+    fn do_descend<N: Node<Id = Self::Id> + ?Sized>(
+        &mut self,
+        a: &N,
+        b: &N,
+    ) -> DoDescend;
+}
+
+struct Equiv<S>
+{
+    limit: i32,
+    state: S,
+}
+
+impl<S, I: Eq> Equiv<S>
+where Self: EquivControl<Id = I>
+{
+    fn equiv<N: Node<Id = I> + ?Sized>(
+        &mut self,
+        a: &N,
+        b: &N,
+    ) -> EquivResult
+    {
+        use {
+            DoDescend::{
+                NoAbort,
+                NoContinue,
+                Yes,
+            },
+            EquivResult::{
+                Abort,
+                Equiv,
+                Unequiv,
+            },
+        };
+
+        if a.id() == b.id() {
+            Equiv
         }
-        Equiv(limit)
-    }
-    else {
-        Unequiv
+        else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b) {
+            let mut i = 0.into();
+            if i < amount_edges {
+                match self.do_descend(a, b) {
+                    Yes =>
+                        while i < amount_edges {
+                            let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
+                            self.limit = self.limit.saturating_sub(1);
+                            match self.equiv(&ae, &be) {
+                                Equiv => (),
+                                result @ (Unequiv | Abort) => return result,
+                            }
+                            i += 1.into();
+                        },
+                    NoContinue => (),
+                    NoAbort => return Abort,
+                }
+            }
+            Equiv
+        }
+        else {
+            Unequiv
+        }
     }
 }
 
 
-// TODO(#2): Could this be refactored to be cleaner. Hopefully refactoring equiv
-// per above will help do that for this.
 fn interleave<N: Node + ?Sized>(
     a: &N,
     b: &N,
     limit: i32,
 ) -> bool
 {
-    fn slow_or_fast<N: Node + ?Sized>(
-        a: &N,
-        b: &N,
-        limit: i32,
-        equiv_classes: &mut EquivClasses<N::Id>,
-    ) -> EquivResult
+    impl<I: Eq + Hash + Clone> EquivControl for Equiv<EquivClasses<I>>
     {
-        if limit < 0 {
-            if limit >= SLOW_LIMIT_NEG {
-                slow(a, b, limit, equiv_classes)
-            }
-            else {
-                fn rand_limit(max: u16) -> i32
-                {
-                    fastrand::i32(0 ..= max.into())
-                }
-                fast(a, b, rand_limit(FAST_LIMIT), equiv_classes)
-            }
-        }
-        else {
-            fast(a, b, limit, equiv_classes)
-        }
-    }
+        type Id = I;
 
-    fn slow<N: Node + ?Sized>(
-        a: &N,
-        b: &N,
-        limit: i32,
-        equiv_classes: &mut EquivClasses<N::Id>,
-    ) -> EquivResult
-    {
-        equiv(
-            a,
-            b,
-            limit,
-            #[allow(clippy::shadow_unrelated)]
-            |a, b, _, eqv_cls| {
-                if eqv_cls.same_class(&a.id(), &b.id()) {
-                    // This is what prevents traversing descendents that have
-                    // already been checked, which prevents infinite loops on
-                    // cycles and is more efficient on shared structure.  Reset
-                    // the counter so that `slow` will be used for longer, on
-                    // the theory that further equivalences in descendents are
-                    // more likely since we found an equivalence (which is
-                    // critical for avoiding stack overflow with shapes like
-                    // "degenerate cyclic".).
-                    DoDescend::NoContinue(-1)
-                }
-                else {
+        fn do_descend<N: Node<Id = Self::Id> + ?Sized>(
+            &mut self,
+            a: &N,
+            b: &N,
+        ) -> DoDescend
+        {
+            fn rand_limit(max: u16) -> i32
+            {
+                fastrand::i32(0 ..= max.into())
+            }
+
+            match self.limit {
+                // "fast" phase
+                0 .. => DoDescend::Yes,
+                // "slow" phase
+                SLOW_LIMIT_NEG ..= -1 =>
+                    if self.state.same_class(&a.id(), &b.id()) {
+                        // This is what prevents traversing descendents that
+                        // have already been checked, which prevents infinite
+                        // loops on cycles and is more efficient on shared
+                        // structure.  Reset the counter so that "slow" will be
+                        // used for longer, on the theory that further
+                        // equivalences in descendents are more likely since we
+                        // found an equivalence (which is critical for avoiding
+                        // stack overflow with shapes like "degenerate
+                        // cyclic".).
+                        self.limit = 0;
+                        DoDescend::NoContinue
+                    }
+                    else {
+                        DoDescend::Yes
+                    },
+                // "slow" limit reached, change to "fast" phase
+                _ /* MIN .. SLOW_LIMIT_NEG */ => {
+                    // Random limits for "fast" "reduce the likelihood of
+                    // repeatedly tripping on worst-case behavior in cases where
+                    // the sizes of the input graphs happen to be related to the
+                    // chosen bounds in a bad way".
+                    self.limit = rand_limit(FAST_LIMIT);
                     DoDescend::Yes
-                }
-            },
-            slow_or_fast,
-            equiv_classes,
-        )
+                },
+            }
+        }
     }
 
-    fn fast<N: Node + ?Sized>(
-        a: &N,
-        b: &N,
-        limit: i32,
-        equiv_classes: &mut EquivClasses<N::Id>,
-    ) -> EquivResult
-    {
-        equiv(a, b, limit, |_, _, _, _| DoDescend::Yes, slow_or_fast, equiv_classes)
-    }
-
-    matches!(slow_or_fast(a, b, limit, &mut EquivClasses::new()), EquivResult::Equiv(_))
+    let mut e = Equiv { limit, state: EquivClasses::new() };
+    matches!(e.equiv(a, b), EquivResult::Equiv)
 }
 
 
@@ -617,28 +618,61 @@ mod tests
     }
 
     #[test]
-    fn precheck_basic()
+    fn limiting()
     {
-        use EquivResult::{
-            Abort,
-            Equiv,
-            Unequiv,
-        };
+        #[derive(PartialEq, Eq, Debug)]
+        enum Result
+        {
+            Unequiv(i32),
+            Abort(i32),
+            Equiv(i32),
+        }
 
-        assert_eq!(precheck(&&leaf(), &&leaf(), 42), Equiv(42));
-        assert_eq!(precheck(&&leaf(), &&leaf(), -1), Equiv(-1));
-        assert_eq!(precheck(&&leaf(), &&end_pair(), 42), Unequiv);
-        assert_eq!(precheck(&&end_pair(), &&leaf(), 42), Unequiv);
-        assert_eq!(precheck(&&end_pair(), &&end_pair(), 7), Equiv(5));
-        assert_eq!(precheck(&&pair(leaf(), end_pair()), &&pair(leaf(), end_pair()), 7), Equiv(3));
-        assert_eq!(precheck(&&end_pair(), &&end_pair(), 0), Abort);
-        assert_eq!(precheck(&&pair(leaf(), end_pair()), &&pair(leaf(), end_pair()), 1), Abort);
+        fn eqv(
+            a: &Datum,
+            b: &Datum,
+            limit: i32,
+        ) -> Result
+        {
+            struct State<I>(PhantomData<I>);
+
+            impl<I> EquivControl for Equiv<State<I>>
+            {
+                type Id = I;
+
+                fn do_descend<N: Node<Id = Self::Id> + ?Sized>(
+                    &mut self,
+                    _a: &N,
+                    _b: &N,
+                ) -> DoDescend
+                {
+                    if self.limit > 0 { DoDescend::Yes } else { DoDescend::NoAbort }
+                }
+            }
+
+            let mut e = Equiv { limit, state: State(PhantomData) };
+            match e.equiv(&a, &b) {
+                EquivResult::Abort => Result::Abort(e.limit),
+                EquivResult::Unequiv => Result::Unequiv(e.limit),
+                EquivResult::Equiv => Result::Equiv(e.limit),
+            }
+        }
+
+        assert_eq!(eqv(&leaf(), &leaf(), 42), Result::Equiv(42));
+        assert_eq!(eqv(&leaf(), &leaf(), -1), Result::Equiv(-1));
+        assert_eq!(eqv(&leaf(), &end_pair(), 42), Result::Unequiv(42));
+        assert_eq!(eqv(&end_pair(), &leaf(), 42), Result::Unequiv(42));
+        assert_eq!(eqv(&end_pair(), &end_pair(), 7), Result::Equiv(5));
+        assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 7), Result::Equiv(3));
+        assert_eq!(eqv(&end_pair(), &end_pair(), 0), Result::Abort(0));
+        assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 1), Result::Abort(-1));
+        assert_eq!(eqv(&pair(leaf(), leaf()), &pair(leaf(), end_pair()), 42), Result::Unequiv(40));
         assert_eq!(
             {
                 let x = pair(end_pair(), leaf());
-                precheck(&&x, &&x, 0)
+                eqv(&x, &x, 0)
             },
-            Equiv(0)
+            Result::Equiv(0)
         );
     }
 
