@@ -1,15 +1,16 @@
-use std::rc::Rc;
-
-use cycle_deep_safe_compare::alt::basic::{
-    precheck_interleave_equiv,
-    Node,
-};
-use tests_utils::{
-    node_types::rc_pair::{
-        Datum,
-        DatumAllocator,
+use {
+    cycle_deep_safe_compare::alt::basic::{
+        precheck_interleave_equiv,
+        Node,
     },
-    shapes::Leaf,
+    std::rc::Rc,
+    tests_utils::{
+        node_types::rc_pair::{
+            Datum,
+            DatumAllocator,
+        },
+        shapes::Leaf,
+    },
 };
 
 
@@ -41,8 +42,7 @@ impl Node for My
 
     fn amount_edges(&self) -> Self::Index
     {
-        match &*self.0.0.borrow()
-        {
+        match &*self.0.0.borrow() {
             None => 0,
             Some((_, _)) => 2,
         }
@@ -53,8 +53,7 @@ impl Node for My
         idx: &Self::Index,
     ) -> Self::Edge
     {
-        match (idx, &*self.0.0.borrow())
-        {
+        match (idx, &*self.0.0.borrow()) {
             (0, Some((a, _))) => My(a.clone()),
             (1, Some((_, b))) => My(b.clone()),
             _ => panic!("invalid"),

@@ -1,12 +1,13 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-};
-
-use crate::shapes::{
-    Allocator,
-    Leaf,
-    Pair,
+use {
+    crate::shapes::{
+        Allocator,
+        Leaf,
+        Pair,
+    },
+    std::{
+        cell::RefCell,
+        rc::Rc,
+    },
 };
 
 

@@ -1,20 +1,21 @@
-use std::{
-    cell::RefCell,
-    convert::identity,
-};
-
-use cycle_deep_safe_compare::alt::basic::{
-    precheck_interleave_equiv,
-    Node,
-};
-use tests_utils::{
-    node_types::diff_index::{
-        Datum,
-        DatumAllocator,
-        Index,
-        Inner,
+use {
+    cycle_deep_safe_compare::alt::basic::{
+        precheck_interleave_equiv,
+        Node,
     },
-    shapes::Leaf,
+    std::{
+        cell::RefCell,
+        convert::identity,
+    },
+    tests_utils::{
+        node_types::diff_index::{
+            Datum,
+            DatumAllocator,
+            Index,
+            Inner,
+        },
+        shapes::Leaf,
+    },
 };
 
 
@@ -46,8 +47,7 @@ impl Node for My
 
     fn amount_edges(&self) -> Self::Index
     {
-        match *self.0.deref()
-        {
+        match *self.0.deref() {
             Inner::Leaf => Index::Zero,
             Inner::Pair(_, _) => Index::Two,
         }
@@ -58,8 +58,7 @@ impl Node for My
         idx: &Self::Index,
     ) -> Self::Edge
     {
-        match (idx, &*self.0.deref())
-        {
+        match (idx, &*self.0.deref()) {
             (Index::Zero, Inner::Pair(a, _)) => My(a.clone()),
             (Index::One, Inner::Pair(_, b)) => My(b.clone()),
             _ => panic!("invalid"),

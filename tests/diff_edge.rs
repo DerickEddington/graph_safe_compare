@@ -1,17 +1,18 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-};
-
-use cycle_deep_safe_compare::alt::basic::{
-    precheck_interleave_equiv,
-    Node,
-};
-use tests_utils::node_types::diff_edge::{
-    Datum1,
-    Datum2,
-    Datum3,
-    Datum4,
+use {
+    cycle_deep_safe_compare::alt::basic::{
+        precheck_interleave_equiv,
+        Node,
+    },
+    std::{
+        cell::RefCell,
+        rc::Rc,
+    },
+    tests_utils::node_types::diff_edge::{
+        Datum1,
+        Datum2,
+        Datum3,
+        Datum4,
+    },
 };
 
 
@@ -47,8 +48,7 @@ impl Node for My1
 
     fn amount_edges(&self) -> Self::Index
     {
-        match &*self.0
-        {
+        match &*self.0 {
             Datum1 { child: None } => 0,
             Datum1 { child: Some(_) } => 1,
         }
@@ -59,8 +59,7 @@ impl Node for My1
         idx: &Self::Index,
     ) -> Self::Edge
     {
-        match (idx, &*self.0)
-        {
+        match (idx, &*self.0) {
             (0, Datum1 { child: Some(d2) }) => My2(Rc::clone(d2)),
             _ => panic!("invalid"),
         }
@@ -88,8 +87,7 @@ impl Node for My2
 
     fn amount_edges(&self) -> Self::Index
     {
-        match &*self.0
-        {
+        match &*self.0 {
             Datum2::Double(_, _) => 2,
             Datum2::Triple(_, _, _) => 3,
         }
@@ -100,8 +98,7 @@ impl Node for My2
         idx: &Self::Index,
     ) -> Self::Edge
     {
-        match (idx, &*self.0)
-        {
+        match (idx, &*self.0) {
             (0, Datum2::Double(d2a, _)) => My3(Rc::clone(d2a)),
             (1, Datum2::Double(_, d2b)) => My3(Rc::clone(d2b)),
             (0, Datum2::Triple(d2a, _, _)) => My3(Rc::clone(d2a)),
@@ -140,8 +137,7 @@ impl Node for My3
 
     fn amount_edges(&self) -> Self::Index
     {
-        match &*self.0.0.borrow()
-        {
+        match &*self.0.0.borrow() {
             Datum4::End => 0,
             Datum4::Link(_) => 1,
         }
@@ -152,8 +148,7 @@ impl Node for My3
         idx: &Self::Index,
     ) -> Self::Edge
     {
-        match (idx, &*self.0.0.borrow())
-        {
+        match (idx, &*self.0.0.borrow()) {
             (0, Datum4::Link(d1)) => My1(Rc::clone(d1)),
             _ => panic!("invalid"),
         }
@@ -190,10 +185,8 @@ fn cyclic()
                 Rc::new(Datum3(RefCell::new(Datum4::End))),
             ))),
         }));
-        if let Some(d2) = &shape.0.child
-        {
-            if let Datum2::Triple(d3a, _d3b, d3c) = &**d2
-            {
+        if let Some(d2) = &shape.0.child {
+            if let Datum2::Triple(d3a, _d3b, d3c) = &**d2 {
                 *d3a.0.borrow_mut() = Datum4::Link(Rc::clone(&shape.0));
                 *d3c.0.borrow_mut() = Datum4::Link(Rc::clone(&shape.0));
                 return shape;

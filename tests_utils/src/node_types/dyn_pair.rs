@@ -1,18 +1,19 @@
-use std::{
-    any::Any,
-    cell::{
-        Cell,
-        Ref,
-        RefCell,
-        RefMut,
+use {
+    crate::shapes::{
+        Allocator,
+        Leaf,
+        Pair,
     },
-    rc::Rc,
-};
-
-use crate::shapes::{
-    Allocator,
-    Leaf,
-    Pair,
+    std::{
+        any::Any,
+        cell::{
+            Cell,
+            Ref,
+            RefCell,
+            RefMut,
+        },
+        rc::Rc,
+    },
 };
 
 
@@ -58,20 +59,16 @@ impl DatumRef
 
         let b = self.0.borrow();
 
-        if b.is::<Datum1>()
-        {
+        if b.is::<Datum1>() {
             DowncastDatum::Datum1(Ref::map(b, downcast_ref))
         }
-        else if b.is::<Datum2<i32>>()
-        {
+        else if b.is::<Datum2<i32>>() {
             DowncastDatum::Datum2Int32(Ref::map(b, downcast_ref))
         }
-        else if b.is::<Datum2<char>>()
-        {
+        else if b.is::<Datum2<char>>() {
             DowncastDatum::Datum2Char(Ref::map(b, downcast_ref))
         }
-        else
-        {
+        else {
             unreachable!();
         }
     }
@@ -85,20 +82,16 @@ impl DatumRef
 
         let b = self.0.borrow_mut();
 
-        if b.is::<Datum1>()
-        {
+        if b.is::<Datum1>() {
             DowncastMutDatum::Datum1(RefMut::map(b, downcast_mut))
         }
-        else if b.is::<Datum2<i32>>()
-        {
+        else if b.is::<Datum2<i32>>() {
             DowncastMutDatum::Datum2Int32(RefMut::map(b, downcast_mut))
         }
-        else if b.is::<Datum2<char>>()
-        {
+        else if b.is::<Datum2<char>>() {
             DowncastMutDatum::Datum2Char(RefMut::map(b, downcast_mut))
         }
-        else
-        {
+        else {
             unreachable!();
         }
     }
@@ -115,40 +108,27 @@ impl PartialEq for DatumRef
         other: &Self,
     ) -> bool
     {
-        match (self.downcast(), other.downcast())
-        {
-            (DowncastDatum::Datum1(d1a), DowncastDatum::Datum1(d1b)) =>
-            {
-                match (&*d1a, &*d1b)
-                {
-                    (Datum1::Empty, Datum1::Empty) => true,
-                    (Datum1::Double(aa, ab), Datum1::Double(ba, bb)) => aa == ba && ab == bb,
-                    _ => false,
-                }
+        match (self.downcast(), other.downcast()) {
+            (DowncastDatum::Datum1(d1a), DowncastDatum::Datum1(d1b)) => match (&*d1a, &*d1b) {
+                (Datum1::Empty, Datum1::Empty) => true,
+                (Datum1::Double(aa, ab), Datum1::Double(ba, bb)) => aa == ba && ab == bb,
+                _ => false,
             },
-            (DowncastDatum::Datum2Int32(d2a), DowncastDatum::Datum2Int32(d2b)) =>
-            {
-                match (&*d2a, &*d2b)
-                {
+            (DowncastDatum::Datum2Int32(d2a), DowncastDatum::Datum2Int32(d2b)) => {
+                match (&*d2a, &*d2b) {
                     (Datum2::Value(a), Datum2::Value(b)) => a == b,
                     (Datum2::Two(aa, ab), Datum2::Two(ba, bb)) => aa == ba && ab == bb,
                     (Datum2::Four(aa, ab, ac, ad), Datum2::Four(ba, bb, bc, bd)) =>
-                    {
-                        aa == ba && ab == bb && ac == bc && ad == bd
-                    },
+                        aa == ba && ab == bb && ac == bc && ad == bd,
                     _ => false,
                 }
             },
-            (DowncastDatum::Datum2Char(d2a), DowncastDatum::Datum2Char(d2b)) =>
-            {
-                match (&*d2a, &*d2b)
-                {
+            (DowncastDatum::Datum2Char(d2a), DowncastDatum::Datum2Char(d2b)) => {
+                match (&*d2a, &*d2b) {
                     (Datum2::Value(a), Datum2::Value(b)) => a == b,
                     (Datum2::Two(aa, ab), Datum2::Two(ba, bb)) => aa == ba && ab == bb,
                     (Datum2::Four(aa, ab, ac, ad), Datum2::Four(ba, bb, bc, bd)) =>
-                    {
-                        aa == ba && ab == bb && ac == bc && ad == bd
-                    },
+                        aa == ba && ab == bb && ac == bc && ad == bd,
                     _ => false,
                 }
             },
@@ -156,9 +136,7 @@ impl PartialEq for DatumRef
         }
     }
 }
-impl Eq for DatumRef
-{
-}
+impl Eq for DatumRef {}
 
 impl Leaf for DatumRef
 {
@@ -178,8 +156,7 @@ impl Pair for DatumRef
         b: Self,
     )
     {
-        match self.downcast_mut()
-        {
+        match self.downcast_mut() {
             DowncastMutDatum::Datum1(mut rd1) => *rd1 = Datum1::Double(a, b),
             DowncastMutDatum::Datum2Int32(mut rd2) => *rd2 = Datum2::Two(a, b),
             DowncastMutDatum::Datum2Char(mut rd2) => *rd2 = Datum2::Two(a, b),
@@ -207,8 +184,7 @@ impl Allocator<DatumRef> for DatumAllocator
     {
         self.counter.set(self.counter.get() + 1);
 
-        match self.counter.get() % 3
-        {
+        match self.counter.get() % 3 {
             0 => DatumRef(Rc::new(RefCell::new(Datum1::Empty))),
             1 => DatumRef(Rc::new(RefCell::new(Datum2::Value(42_i32)))),
             2 => DatumRef(Rc::new(RefCell::new(Datum2::Value('λ')))),

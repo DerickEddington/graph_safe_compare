@@ -1,18 +1,19 @@
-use std::{
-    cell::{
-        Cell,
-        Ref,
-        RefCell,
-        RefMut,
+use {
+    crate::shapes::{
+        Allocator,
+        Leaf,
+        Pair,
     },
-    ops::AddAssign,
-    rc::Rc,
-};
-
-use crate::shapes::{
-    Allocator,
-    Leaf,
-    Pair,
+    std::{
+        cell::{
+            Cell,
+            Ref,
+            RefCell,
+            RefMut,
+        },
+        ops::AddAssign,
+        rc::Rc,
+    },
 };
 
 
@@ -50,9 +51,7 @@ impl PartialEq for Datum
         *self.deref() == *other.deref()
     }
 }
-impl Eq for Datum
-{
-}
+impl Eq for Datum {}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Inner
@@ -88,8 +87,7 @@ impl From<u8> for Index
 {
     fn from(n: u8) -> Self
     {
-        match n
-        {
+        match n {
             0 => Index::Zero,
             1 => Index::One,
             2 => Index::Two,

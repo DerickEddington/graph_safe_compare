@@ -11,8 +11,7 @@ pub trait Leaf: Sized
     fn new_in(alloc: &Self::Alloc) -> Self;
 
     fn new() -> Self
-    where
-        Self::Alloc: Default,
+    where Self::Alloc: Default
     {
         Self::new_in(&Self::Alloc::default())
     }
@@ -70,8 +69,7 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
     }
 
     pub fn new(depth: u32) -> Self
-    where
-        A: Default,
+    where A: Default
     {
         Self::new_with(depth, A::default())
     }
@@ -109,12 +107,10 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
         mut b: F2,
     ) -> (T, T)
     {
-        while self.depth >= 1
-        {
+        while self.depth >= 1 {
             self.depth = self.depth.saturating_sub(1);
             self.head = <T as Pair>::new_in(a(&mut self), b(&mut self), &self.alloc);
         }
-
         (self.head, self.tail)
     }
 

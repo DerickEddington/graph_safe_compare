@@ -193,8 +193,7 @@ pub fn precheck_interleave_equiv<N: Node + ?Sized>(
     b: &N,
 ) -> bool
 {
-    match precheck(a, b, PRE_LIMIT.into())
-    {
+    match precheck(a, b, PRE_LIMIT.into()) {
         EquivResult::Equiv(_) => true,
         EquivResult::Unequiv => false,
         EquivResult::Abort => interleave(a, b, -1),
@@ -251,50 +250,43 @@ fn equiv<
     state: &mut S,
 ) -> EquivResult
 {
-    use EquivResult::{
-        Abort,
-        Equiv,
-        Unequiv,
+    use {
+        DoDescend::{
+            NoAbort,
+            NoContinue,
+            Yes,
+        },
+        EquivResult::{
+            Abort,
+            Equiv,
+            Unequiv,
+        },
     };
 
-    if a.id() == b.id()
-    {
+    if a.id() == b.id() {
         Equiv(limit)
     }
-    else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b)
-    {
+    else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b) {
         let mut i = 0.into();
-
-        if i < amount_edges
-        {
-            match do_descend(a, b, limit, state)
-            {
-                DoDescend::Yes =>
-                {
-                    while i < amount_edges
-                    {
+        if i < amount_edges {
+            match do_descend(a, b, limit, state) {
+                Yes =>
+                    while i < amount_edges {
                         let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
-
                         limit = limit.saturating_sub(1);
-
-                        match recur(&ae, &be, limit, state)
-                        {
+                        match recur(&ae, &be, limit, state) {
                             Equiv(lim) => limit = lim,
                             result @ (Unequiv | Abort) => return result,
                         }
-
                         i += 1.into();
-                    }
-                },
-                DoDescend::NoContinue(lim) => limit = lim,
-                DoDescend::NoAbort => return Abort,
+                    },
+                NoContinue(lim) => limit = lim,
+                NoAbort => return Abort,
             }
         }
-
         Equiv(limit)
     }
-    else
-    {
+    else {
         Unequiv
     }
 }
@@ -315,24 +307,19 @@ fn interleave<N: Node + ?Sized>(
         equiv_classes: &mut EquivClasses<N::Id>,
     ) -> EquivResult
     {
-        if limit < 0
-        {
-            if limit >= SLOW_LIMIT_NEG
-            {
+        if limit < 0 {
+            if limit >= SLOW_LIMIT_NEG {
                 slow(a, b, limit, equiv_classes)
             }
-            else
-            {
+            else {
                 fn rand_limit(max: u16) -> i32
                 {
                     fastrand::i32(0 ..= max.into())
                 }
-
                 fast(a, b, rand_limit(FAST_LIMIT), equiv_classes)
             }
         }
-        else
-        {
+        else {
             fast(a, b, limit, equiv_classes)
         }
     }
@@ -349,8 +336,7 @@ fn interleave<N: Node + ?Sized>(
             b,
             limit,
             |a, b, _, eqv_cls| {
-                if eqv_cls.same_class(&a.id(), &b.id())
-                {
+                if eqv_cls.same_class(&a.id(), &b.id()) {
                     // This is what prevents traversing descendents that have
                     // already been checked, which prevents infinite loops on
                     // cycles and is more efficient on shared structure.  Reset
@@ -361,8 +347,7 @@ fn interleave<N: Node + ?Sized>(
                     // "degenerate cyclic".).
                     DoDescend::NoContinue(-1)
                 }
-                else
-                {
+                else {
                     DoDescend::Yes
                 }
             },
@@ -421,9 +406,7 @@ impl PartialEq for Representative
         ptr::eq(self, other)
     }
 }
-impl Eq for Representative
-{
-}
+impl Eq for Representative {}
 
 impl EquivClassChain
 {
@@ -452,22 +435,17 @@ impl EquivClassChain
     fn rep_of(it: &Rc<Cell<Self>>) -> Rc<Cell<Representative>>
     {
         let it_inner = Self::clone_inner(it);
-        match it_inner
-        {
+        match it_inner {
             Self::End(rep) => rep,
 
-            Self::Next(mut next) =>
-            {
+            Self::Next(mut next) => {
                 let mut cur = Rc::clone(it);
-                loop
-                {
+                loop {
                     let next_inner = Self::clone_inner(&next);
-                    match next_inner
-                    {
+                    match next_inner {
                         Self::End(rep) => break rep,
 
-                        Self::Next(next_next) =>
-                        {
+                        Self::Next(next_next) => {
                             cur.set(Self::Next(Rc::clone(&next_next)));
                             cur = next;
                             next = next_next;
@@ -517,23 +495,19 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
         let arep = EquivClassChain::rep_of(aec);
         let brep = EquivClassChain::rep_of(bec);
 
-        if arep == brep
-        {
+        if arep == brep {
             true
         }
-        else
-        {
+        else {
             let (aw, bw) = (arep.get().weight, brep.get().weight);
             let (larger_chain, larger_rep, smaller_chain);
 
-            if aw >= bw
-            {
+            if aw >= bw {
                 larger_chain = aec;
                 larger_rep = arep;
                 smaller_chain = bec;
             }
-            else
-            {
+            else {
                 larger_chain = bec;
                 larger_rep = brep;
                 smaller_chain = aec;
@@ -550,21 +524,17 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
         bk: &K,
     ) -> bool
     {
-        match (self.map.get(ak), self.map.get(bk))
-        {
-            (None, None) =>
-            {
+        match (self.map.get(ak), self.map.get(bk)) {
+            (None, None) => {
                 self.none_seen(ak, bk);
                 false
             },
-            (Some(aec), None) =>
-            {
+            (Some(aec), None) => {
                 let aec = &Rc::clone(aec); // To end borrow of `self`.
                 self.some_seen(aec, bk);
                 false
             },
-            (None, Some(bec)) =>
-            {
+            (None, Some(bec)) => {
                 let bec = &Rc::clone(bec); // To end borrow of `self`.
                 self.some_seen(bec, ak);
                 false
@@ -617,8 +587,7 @@ mod tests
 
         fn amount_edges(&self) -> Self::Index
         {
-            match self
-            {
+            match self {
                 Datum::Leaf => 0,
                 Datum::Pair(_, _) => 2,
             }
@@ -629,8 +598,7 @@ mod tests
             idx: &Self::Index,
         ) -> Self::Edge
         {
-            match (idx, self)
-            {
+            match (idx, self) {
                 #![allow(clippy::panic)]
                 (0, Datum::Pair(a, _)) => a,
                 (1, Datum::Pair(_, b)) => b,
@@ -743,10 +711,8 @@ mod tests
         assert!(ec.same_class(&keys[4], &keys[5]));
         assert!(!ec.same_class(&keys[1], &keys[4]));
 
-        for a in &keys
-        {
-            for b in &keys
-            {
+        for a in &keys {
+            for b in &keys {
                 assert!(ec.same_class(a, b));
             }
         }
