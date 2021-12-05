@@ -212,7 +212,7 @@ fn precheck<N: Node + ?Sized>(
         b,
         limit,
         |_, _, lim, _| if lim > 0 { DoDescend::Yes } else { DoDescend::NoAbort },
-        |a, b, lim, _| precheck(a, b, lim),
+        |ae, be, lim, _| precheck(ae, be, lim),
         &mut (),
     )
 }
@@ -335,6 +335,7 @@ fn interleave<N: Node + ?Sized>(
             a,
             b,
             limit,
+            #[allow(clippy::shadow_unrelated)]
             |a, b, _, eqv_cls| {
                 if eqv_cls.same_class(&a.id(), &b.id()) {
                     // This is what prevents traversing descendents that have

@@ -42,7 +42,8 @@
 #![allow(
     clippy::implicit_return,
     clippy::blanket_clippy_restriction_lints,
-    clippy::pattern_type_mismatch
+    clippy::pattern_type_mismatch,
+    clippy::shadow_reuse
 )]
 // TODO: Temporary
 #![allow(
