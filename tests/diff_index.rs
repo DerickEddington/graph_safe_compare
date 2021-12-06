@@ -36,7 +36,6 @@ impl PartialEq for My
 
 impl Node for My
 {
-    type Edge = Self;
     type Id = (Index, *const [RefCell<Inner>]);
     type Index = Index;
 
@@ -56,7 +55,7 @@ impl Node for My
     fn get_edge(
         &self,
         idx: &Self::Index,
-    ) -> Self::Edge
+    ) -> Self
     {
         match (idx, &*self.0.deref()) {
             (Index::Zero, Inner::Pair(a, _)) => My(a.clone()),

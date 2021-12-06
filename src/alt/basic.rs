@@ -66,10 +66,6 @@ pub trait Node
     /// logical or convenient to use an index type that is not a number.
     type Index: Eq + Ord + AddAssign + From<u8>;
 
-    /// The descendent node type may be the same as `Self` or may be different
-    /// as long as the [`Id`](Node::Id) type is the same.
-    type Edge: Node<Id = Self::Id>;
-
     /// Get the identity of the `self` node.  The result must only be `==` to
     /// another node's when the nodes should be considered identical.
     fn id(&self) -> Self::Id;
@@ -93,7 +89,7 @@ pub trait Node
     fn get_edge(
         &self,
         index: &Self::Index,
-    ) -> Self::Edge;
+    ) -> Self;
 
     /// Check if the nodes are equivalent in their own directly-contained
     /// semantically-significant values ignoring their edges and ignoring their
@@ -193,7 +189,7 @@ pub trait Node
 
 /// The main equivalence algorithm which can be used for [`PartialEq`]
 /// implementations.  TODO(#10): more about...
-pub fn precheck_interleave_equiv<N: Node + ?Sized>(
+pub fn precheck_interleave_equiv<N: Node>(
     a: &N,
     b: &N,
 ) -> bool
@@ -205,19 +201,19 @@ pub fn precheck_interleave_equiv<N: Node + ?Sized>(
 }
 
 
-fn precheck<N: Node + ?Sized>(
+fn precheck<N: Node>(
     a: &N,
     b: &N,
     limit: i32,
 ) -> ControlFlow<bool, ()>
 {
-    struct Precheck<I>(PhantomData<I>);
+    struct Precheck;
 
-    impl<I: Eq> EquivControl for Equiv<Precheck<I>>
+    impl<N: Node> EquivControl for Equiv<Precheck, N>
     {
-        type Id = I;
+        type Node = N;
 
-        fn do_descend<N: Node<Id = Self::Id> + ?Sized>(
+        fn do_descend(
             &mut self,
             _a: &N,
             _b: &N,
@@ -226,7 +222,7 @@ fn precheck<N: Node + ?Sized>(
             self.do_descend_above_limit()
         }
 
-        fn recur<N: Node<Id = Self::Id>>(
+        fn recur(
             &mut self,
             a: N,
             b: N,
@@ -236,44 +232,53 @@ fn precheck<N: Node + ?Sized>(
         }
     }
 
-    let mut e = Equiv { limit, state: Precheck(PhantomData) };
+    let mut e = Equiv::<_, N>::new(limit, Precheck);
 
-    e.equiv::<_, N>(a, b).map_or(ControlFlow::Continue(()), ControlFlow::Break)
+    e.equiv(a, b).map_or(ControlFlow::Continue(()), ControlFlow::Break)
 }
 
 
 trait EquivControl
 {
-    type Id;
+    type Node: Node;
 
-    fn do_descend<N: Node<Id = Self::Id> + ?Sized>(
+    fn do_descend(
         &mut self,
-        a: &N,
-        b: &N,
+        a: &Self::Node,
+        b: &Self::Node,
     ) -> ControlFlow<(), bool>;
 
-    fn recur<N: Node<Id = Self::Id>>(
+    fn recur(
         &mut self,
-        a: N,
-        b: N,
+        a: Self::Node,
+        b: Self::Node,
     ) -> Result<bool, ()>;
 
-    fn next<T: Borrow<N>, N: Node<Id = Self::Id> + ?Sized>(&mut self) -> Option<(T, T)>
+    fn next<T: Borrow<Self::Node>>(&mut self) -> Option<(T, T)>
     {
         None
     }
 }
 
-struct Equiv<S>
+struct Equiv<S, N>
 {
     limit: i32,
     state: S,
+    _node: PhantomData<N>,
 }
 
-impl<S, I: Eq> Equiv<S>
-where Self: EquivControl<Id = I>
+impl<S, N: Node> Equiv<S, N>
+where Self: EquivControl<Node = N>
 {
-    fn equiv<T: Borrow<N>, N: Node<Id = I> + ?Sized>(
+    fn new(
+        limit: i32,
+        state: S,
+    ) -> Self
+    {
+        Self { limit, state, _node: PhantomData }
+    }
+
+    fn equiv<T: Borrow<N>>(
         &mut self,
         mut ai: T,
         mut bi: T,
@@ -322,7 +327,7 @@ where Self: EquivControl<Id = I>
         if self.limit > 0 { ControlFlow::Continue(true) } else { ControlFlow::Break(()) }
     }
 
-    fn recur_on_callstack<N: Node<Id = I>>(
+    fn recur_on_callstack(
         &mut self,
         a: N,
         b: N,
@@ -333,17 +338,17 @@ where Self: EquivControl<Id = I>
 }
 
 
-fn interleave<N: Node + ?Sized>(
+fn interleave<N: Node>(
     a: &N,
     b: &N,
     limit: i32,
 ) -> bool
 {
-    impl<I: Eq + Hash + Clone> EquivControl for Equiv<EquivClasses<I>>
+    impl<N: Node> EquivControl for Equiv<EquivClasses<N::Id>, N>
     {
-        type Id = I;
+        type Node = N;
 
-        fn do_descend<N: Node<Id = Self::Id> + ?Sized>(
+        fn do_descend(
             &mut self,
             a: &N,
             b: &N,
@@ -387,7 +392,7 @@ fn interleave<N: Node + ?Sized>(
             }
         }
 
-        fn recur<N: Node<Id = Self::Id>>(
+        fn recur(
             &mut self,
             a: N,
             b: N,
@@ -397,8 +402,8 @@ fn interleave<N: Node + ?Sized>(
         }
     }
 
-    let mut e = Equiv { limit, state: EquivClasses::new() };
-    matches!(e.equiv::<_, N>(a, b), Ok(true))
+    let mut e = Equiv::<_, N>::new(limit, EquivClasses::new());
+    matches!(e.equiv(a, b), Ok(true))
 }
 
 
@@ -609,7 +614,6 @@ mod tests
 
     impl Node for &Datum
     {
-        type Edge = Self;
         type Id = *const Datum;
         type Index = u8;
 
@@ -629,7 +633,7 @@ mod tests
         fn get_edge(
             &self,
             idx: &Self::Index,
-        ) -> Self::Edge
+        ) -> Self
         {
             match (idx, self) {
                 #![allow(clippy::panic)]
@@ -665,13 +669,13 @@ mod tests
             limit: i32,
         ) -> ResultLimit
         {
-            struct State<I>(PhantomData<I>);
+            struct State;
 
-            impl<I: Eq> EquivControl for Equiv<State<I>>
+            impl<N: Node> EquivControl for Equiv<State, N>
             {
-                type Id = I;
+                type Node = N;
 
-                fn do_descend<N: Node<Id = Self::Id> + ?Sized>(
+                fn do_descend(
                     &mut self,
                     _a: &N,
                     _b: &N,
@@ -680,7 +684,7 @@ mod tests
                     self.do_descend_above_limit()
                 }
 
-                fn recur<N: Node<Id = Self::Id>>(
+                fn recur(
                     &mut self,
                     a: N,
                     b: N,
@@ -690,9 +694,9 @@ mod tests
                 }
             }
 
-            let mut e = Equiv { limit, state: State(PhantomData) };
+            let mut e = Equiv::<_, &Datum>::new(limit, State);
 
-            match e.equiv::<_, &Datum>(&a, &b) {
+            match e.equiv(a, b) {
                 Ok(true) => True(e.limit),
                 Ok(false) => False(e.limit),
                 Err(()) => Abort(e.limit),

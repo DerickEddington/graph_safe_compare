@@ -34,7 +34,6 @@ impl PartialEq for My
 
 impl Node for My
 {
-    type Edge = Self;
     type Id = *const dyn Any;
     type Index = usize;
 
@@ -66,7 +65,7 @@ impl Node for My
     fn get_edge(
         &self,
         idx: &Self::Index,
-    ) -> Self::Edge
+    ) -> Self
     {
         match self.0.downcast() {
             DowncastDatum::Datum1(rd1) => match (idx, &*rd1) {

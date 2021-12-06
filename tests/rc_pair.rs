@@ -31,7 +31,6 @@ impl PartialEq for My
 
 impl Node for My
 {
-    type Edge = Self;
     type Id = *const Datum;
     type Index = usize;
 
@@ -51,7 +50,7 @@ impl Node for My
     fn get_edge(
         &self,
         idx: &Self::Index,
-    ) -> Self::Edge
+    ) -> Self
     {
         match (idx, &*self.0.0.borrow()) {
             (0, Some((a, _))) => My(a.clone()),
