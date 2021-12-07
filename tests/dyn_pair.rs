@@ -17,7 +17,6 @@ use {
 };
 
 
-/// New type needed so we can impl the `Node` and `PartialEq` traits on it.
 #[derive(Debug)]
 struct My(DatumRef);
 
@@ -109,15 +108,6 @@ impl Node for My
 }
 
 
-#[test]
-fn rudimentary()
-{
-    let leaf1 = Leaf::new_in(&DatumAllocator::new(1));
-    let leaf2 = Leaf::new_in(&DatumAllocator::new(1));
-    assert_eq!(My(leaf1), My(leaf2));
-}
-
-
 use std::convert::identity;
 
-tests_utils::eq_tests!(identity, DatumAllocator::new, My);
+tests_utils::eq_variations_tests!(My, DatumRef, identity, DatumAllocator::new);

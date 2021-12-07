@@ -254,7 +254,7 @@ trait EquivControl
         b: Self::Node,
     ) -> Result<bool, ()>;
 
-    fn next<T: Borrow<Self::Node>>(&mut self) -> Option<(T, T)>
+    fn next(&mut self) -> Option<(Self::Node, Self::Node)>
     {
         None
     }
@@ -280,46 +280,68 @@ where Self: EquivControl<Node = N>
 
     fn equiv<T: Borrow<N>>(
         &mut self,
-        mut ai: T,
-        mut bi: T,
+        ai: T,
+        bi: T,
     ) -> Result<bool, ()>
     {
+        let (mut ar, mut br) = (ai.borrow(), bi.borrow());
+        let (mut ao, mut bo): (N, N);
+
+        // This loop, when used in conjunction with certain `self.recur` and
+        // `self.next` implementations, is what prevents growing the call-stack,
+        // and so prevents the possibility of stack overflow, when traversing
+        // descendents.  For other implementations where the `self.recur` does
+        // grow the call-stack, the `self.next` always returns `None` and so
+        // this loop is optimized away.
         loop {
-            let (a, b) = (ai.borrow(), bi.borrow());
-
-            if a.id() == b.id() {
-            }
-            else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b) {
-                let mut i = 0.into();
-                if i < amount_edges {
-                    match self.do_descend(a, b) {
-                        ControlFlow::Continue(true) =>
-                            while i < amount_edges {
-                                let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
-                                self.limit = self.limit.saturating_sub(1);
-                                match self.recur(ae, be) {
-                                    Ok(true) => (),
-                                    result => return result,
-                                }
-                                i += 1.into();
-                            },
-                        ControlFlow::Continue(false) => (),
-                        ControlFlow::Break(()) => return Err(()),
-                    }
-                }
-            }
-            else {
-                return Ok(false);
+            match self.equiv_main(ar, br) {
+                Ok(true) => (),
+                result => return result,
             }
 
-            if let Some(next) = self.next() {
-                ai = next.0;
-                bi = next.1;
+            if let Some((an, bn)) = self.next() {
+                ao = an;
+                bo = bn;
+                ar = &ao;
+                br = &bo;
             }
             else {
                 break Ok(true);
             }
         }
+    }
+
+    fn equiv_main(
+        &mut self,
+        a: &N,
+        b: &N,
+    ) -> Result<bool, ()>
+    {
+        if a.id() == b.id() {
+        }
+        else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b) {
+            let mut i = 0.into();
+            if i < amount_edges {
+                match self.do_descend(a, b) {
+                    ControlFlow::Continue(true) =>
+                        while i < amount_edges {
+                            let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
+                            self.limit = self.limit.saturating_sub(1);
+                            match self.recur(ae, be) {
+                                Ok(true) => (),
+                                result => return result,
+                            }
+                            i += 1.into();
+                        },
+                    ControlFlow::Continue(false) => (),
+                    ControlFlow::Break(()) => return Err(()),
+                }
+            }
+        }
+        else {
+            return Ok(false);
+        }
+        Ok(true)
     }
 
     fn do_descend_above_limit(&mut self) -> ControlFlow<(), bool>
@@ -338,13 +360,72 @@ where Self: EquivControl<Node = N>
 }
 
 
+impl<S: AsMut<EquivClasses<N::Id>>, N: Node> Equiv<S, N>
+{
+    fn do_descend_slow_or_fast(
+        &mut self,
+        a: &N,
+        b: &N,
+    ) -> ControlFlow<(), bool>
+    {
+        fn rand_limit(max: u16) -> i32
+        {
+            fastrand::i32(0 ..= max.into())
+        }
+
+        match self.limit {
+
+            // "fast" phase
+            0 .. => ControlFlow::Continue(true),
+
+            // "slow" phase
+            SLOW_LIMIT_NEG ..= -1 =>
+                if self.state.as_mut().same_class(&a.id(), &b.id()) {
+                    // This is what prevents traversing descendents that have
+                    // already been checked, which prevents infinite loops on
+                    // cycles and is more efficient on shared structure.  Reset
+                    // the counter so that "slow" will be used for longer, "on
+                    // the theory that if one equivalence is found, more are
+                    // likely to be found" (which is critical for avoiding stack
+                    // overflow with shapes like "degenerate cyclic").
+                    self.limit = -1;
+                    ControlFlow::Continue(false)
+                }
+            else {
+                ControlFlow::Continue(true)
+            },
+
+            // "slow" limit reached, change to "fast" phase
+            _ /* MIN .. SLOW_LIMIT_NEG */ => {
+                // Random limits for "fast" "reduce the likelihood of
+                // repeatedly tripping on worst-case behavior in cases where
+                // the sizes of the input graphs happen to be related to the
+                // chosen bounds in a bad way".
+                self.limit = rand_limit(FAST_LIMIT);
+                ControlFlow::Continue(true)
+            },
+        }
+    }
+}
+
+
 fn interleave<N: Node>(
     a: &N,
     b: &N,
     limit: i32,
 ) -> bool
 {
-    impl<N: Node> EquivControl for Equiv<EquivClasses<N::Id>, N>
+    struct Interleave<I>(EquivClasses<I>);
+
+    impl<I> AsMut<EquivClasses<I>> for Interleave<I>
+    {
+        fn as_mut(&mut self) -> &mut EquivClasses<I>
+        {
+            &mut self.0
+        }
+    }
+
+    impl<N: Node> EquivControl for Equiv<Interleave<N::Id>, N>
     {
         type Node = N;
 
@@ -354,42 +435,7 @@ fn interleave<N: Node>(
             b: &N,
         ) -> ControlFlow<(), bool>
         {
-            fn rand_limit(max: u16) -> i32
-            {
-                fastrand::i32(0 ..= max.into())
-            }
-
-            match self.limit {
-                // "fast" phase
-                0 .. => ControlFlow::Continue(true),
-                // "slow" phase
-                SLOW_LIMIT_NEG ..= -1 =>
-                    if self.state.same_class(&a.id(), &b.id()) {
-                        // This is what prevents traversing descendents that
-                        // have already been checked, which prevents infinite
-                        // loops on cycles and is more efficient on shared
-                        // structure.  Reset the counter so that "slow" will be
-                        // used for longer, on the theory that further
-                        // equivalences in descendents are more likely since we
-                        // found an equivalence (which is critical for avoiding
-                        // stack overflow with shapes like "degenerate
-                        // cyclic".).
-                        self.limit = -1;
-                        ControlFlow::Continue(false)
-                    }
-                    else {
-                        ControlFlow::Continue(true)
-                    },
-                // "slow" limit reached, change to "fast" phase
-                _ /* MIN .. SLOW_LIMIT_NEG */ => {
-                    // Random limits for "fast" "reduce the likelihood of
-                    // repeatedly tripping on worst-case behavior in cases where
-                    // the sizes of the input graphs happen to be related to the
-                    // chosen bounds in a bad way".
-                    self.limit = rand_limit(FAST_LIMIT);
-                    ControlFlow::Continue(true)
-                },
-            }
+            self.do_descend_slow_or_fast(a, b)
         }
 
         fn recur(
@@ -402,7 +448,7 @@ fn interleave<N: Node>(
         }
     }
 
-    let mut e = Equiv::<_, N>::new(limit, EquivClasses::new());
+    let mut e = Equiv::<_, N>::new(limit, Interleave(EquivClasses::new()));
     matches!(e.equiv(a, b), Ok(true))
 }
 

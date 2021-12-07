@@ -1,8 +1,5 @@
 use {
-    cycle_deep_safe_compare::alt::basic::{
-        precheck_interleave_equiv,
-        Node,
-    },
+    cycle_deep_safe_compare::alt::basic::Node,
     std::rc::Rc,
     tests_utils::{
         node_types::rc_pair::{
@@ -14,20 +11,8 @@ use {
 };
 
 
-/// New type needed so we can impl the `Node` and `PartialEq` traits on it.
 #[derive(Debug)]
 struct My(Rc<Datum>);
-
-impl PartialEq for My
-{
-    fn eq(
-        &self,
-        other: &Self,
-    ) -> bool
-    {
-        precheck_interleave_equiv(self, other)
-    }
-}
 
 impl Node for My
 {
@@ -69,15 +54,6 @@ impl Node for My
 }
 
 
-#[test]
-fn rudimentary()
-{
-    let leaf1 = Leaf::new_in(&DatumAllocator);
-    let leaf2 = Leaf::new_in(&DatumAllocator);
-    assert_eq!(My(leaf1), My(leaf2));
-}
-
-
 use std::convert::identity;
 
-tests_utils::eq_tests!(identity, DatumAllocator::new, My);
+tests_utils::eq_variations_tests!(My, Rc<Datum>, identity, DatumAllocator::new);
