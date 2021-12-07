@@ -1,6 +1,5 @@
-//! Demonstrate that the usual derived PartialEq algorithm cannot handle cyclic
-//! graphs nor very-deep DAGs and that it handles large amounts of shared
-//! structure inefficiently.
+//! Demonstrate that the usual derived PartialEq algorithm cannot handle cyclic graphs nor
+//! very-deep DAGs and that it handles large amounts of shared structure inefficiently.
 
 #![cfg(test)]
 

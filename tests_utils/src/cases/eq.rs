@@ -242,8 +242,8 @@ macro_rules! eq_variations_tests
                               #[cfg(all())], #[ignore], #[cfg(all())]);
         }
 
-        /// Use the variation of the algorithm that does not use the call stack and that can handle
-        /// very-deep graphs and stack overflow cannot happen.
+        /// Use the variation of the algorithm that does not use the call stack and that can
+        /// handle very-deep graphs and stack overflow cannot happen.
         #[cfg(test)]
         mod robust
         {

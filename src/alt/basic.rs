@@ -15,8 +15,8 @@ use std::{
 };
 
 
-// TODO: These values are from the paper, which is for Scheme.  Other values
-// might be more optimal for this Rust variation?
+// TODO: These values are from the paper, which is for Scheme.  Other values might be more optimal
+// for this Rust variation?
 const PRE_LIMIT: u16 = 400;
 const FAST_LIMIT: u16 = 2 * PRE_LIMIT;
 #[allow(clippy::integer_division)]
@@ -28,73 +28,66 @@ const SLOW_LIMIT_NEG: i32 = -(SLOW_LIMIT as i32);
 /// What the main equivalence algorithm needs from a type.
 pub trait Node
 {
-    /// Determines when nodes are the same identical node and so can immediately
-    /// be considered equivalent without checking their values, edges, nor
-    /// descendents.  The size of and methods on this type should be small and
-    /// very cheap.
+    /// Determines when nodes are the same identical node and so can immediately be considered
+    /// equivalent without checking their values, edges, nor descendents.  The size of and methods
+    /// on this type should be small and very cheap.
     ///
-    /// For types where only nodes that are the same object in memory can be
-    /// considered identical, pointer/address equality and hashing should be
-    /// used by defining this type to be `*const T` where `T` is either `Self`
-    /// or the primary inner type.  Such pointers are never dereferenced, and so
-    /// there is no `unsafe` usage.  (Unfortunately, trying to use `&T` would
-    /// cause too many difficulties with lifetimes.  Using `*const T` is valid
-    /// for the algorithm because the lifetimes of the `&Self` borrows for the
-    /// entry-point [`precheck_interleave_equiv`] function calls outlive such
-    /// pointers used internally, and so the `Self` objects cannot move during
-    /// those lifetimes and so the pointers remain valid.)
+    /// For types where only nodes that are the same object in memory can be considered identical,
+    /// pointer/address equality and hashing should be used by defining this type to be `*const T`
+    /// where `T` is either `Self` or the primary inner type.  Such pointers are never
+    /// dereferenced, and so there is no `unsafe` usage.  (Unfortunately, trying to use `&T` would
+    /// cause too many difficulties with lifetimes.  Using `*const T` is valid for the algorithm
+    /// because the lifetimes of the `&Self` borrows for the entry-point
+    /// [`precheck_interleave_equiv`] function calls outlive such pointers used internally, and so
+    /// the `Self` objects cannot move during those lifetimes and so the pointers remain valid.)
     ///
-    /// For other types where different `Self` objects can represent the same
-    /// identical node, some approach following that should be provided, and the
-    /// pointer/address approach should not be used.
+    /// For other types where different `Self` objects can represent the same identical node, some
+    /// approach following that should be provided, and the pointer/address approach should not be
+    /// used.
     type Id: Eq + Hash + Clone;
 
-    /// Determines what is used to index descendent nodes and to represent the
-    /// amount of them.  The primitive unsigned integer types, like `usize`, are
-    /// a common choice, but it may be anything that satisfies the trait bounds.
+    /// Determines what is used to index descendent nodes and to represent the amount of them.
+    /// The primitive unsigned integer types, like `usize`, are a common choice, but it may be
+    /// anything that satisfies the trait bounds.
     ///
-    /// Only `Self::Index::from(0)`, `Self::Index::from(1)`, and
-    /// `Self::Index::add_assign(index, 1.into())` are actually used by the
-    /// algorithm, and so the type does not actually have to support `From<u8>`
-    /// for the rest of the `u8` range, and does not actually have to support
-    /// `AddAssign` of increments other than the unit value nor of results
-    /// beyond the maximum possible amount of edges.
+    /// Only `Self::Index::from(0)`, `Self::Index::from(1)`, and `Self::Index::add_assign(index,
+    /// 1.into())` are actually used by the algorithm, and so the type does not actually have to
+    /// support `From<u8>` for the rest of the `u8` range, and does not actually have to support
+    /// `AddAssign` of increments other than the unit value nor of results beyond the maximum
+    /// possible amount of edges.
     ///
-    /// E.g. for graphs with nodes whose amounts of edges are always smaller
-    /// than some limit, it might be desirable, for efficiency, to use an index
-    /// type smaller than `usize`.  Or for other node types, it might be more
-    /// logical or convenient to use an index type that is not a number.
+    /// E.g. for graphs with nodes whose amounts of edges are always smaller than some limit, it
+    /// might be desirable, for efficiency, to use an index type smaller than `usize`.  Or for
+    /// other node types, it might be more logical or convenient to use an index type that is not
+    /// a number.
     type Index: Eq + Ord + AddAssign + From<u8>;
 
-    /// Get the identity of the `self` node.  The result must only be `==` to
-    /// another node's when the nodes should be considered identical.
+    /// Get the identity of the `self` node.  The result must only be `==` to another node's when
+    /// the nodes should be considered identical.
     fn id(&self) -> Self::Id;
 
-    /// Determines how many edges the `self` node has that the algorithm will
-    /// descend into and check.  All indices in the range `0.into()
-    /// .. self.amount_edges()` must be valid to call
+    /// Determines how many edges the `self` node has that the algorithm will descend into and
+    /// check.  All indices in the range `0.into() .. self.amount_edges()` must be valid to call
     /// [`self.get_edge(index)`](Self::get_edge) with.
     fn amount_edges(&self) -> Self::Index;
 
-    /// Get descendent node by index.  The index must be within the range
-    /// `0.into() .. self.amount_edges()`.  The algorithm calls this method, for
-    /// each index in that range, to descend into each edge.
+    /// Get descendent node by index.  The index must be within the range `0.into()
+    /// .. self.amount_edges()`.  The algorithm calls this method, for each index in that range,
+    /// to descend into each edge.
     ///
     /// # Panics
     ///
-    /// Panics if the index is out of bounds.  But since the same implementor
-    /// controls [`Self::amount_edges`], and when that is implemented correctly,
-    /// as it must be, then such out-of-bounds panics are impossible, as used by
-    /// the algorithm.
+    /// Panics if the index is out of bounds.  But since the same implementor controls
+    /// [`Self::amount_edges`], and when that is implemented correctly, as it must be, then such
+    /// out-of-bounds panics are impossible, as used by the algorithm.
     fn get_edge(
         &self,
         index: &Self::Index,
     ) -> Self;
 
-    /// Check if the nodes are equivalent in their own directly-contained
-    /// semantically-significant values ignoring their edges and ignoring their
-    /// descendent nodes.  This is intended to be used by
-    /// [`Self::equiv_modulo_descendents_then_amount_edges`].
+    /// Check if the nodes are equivalent in their own directly-contained semantically-significant
+    /// values ignoring their edges and ignoring their descendent nodes.  This is intended to be
+    /// used by [`Self::equiv_modulo_descendents_then_amount_edges`].
     ///
     /// E.g. a node type like:
     ///
@@ -105,12 +98,11 @@ pub trait Node
     /// }
     /// ```
     ///
-    /// Requires that the implementor decide whether the value of the `value`
-    /// field should affect equivalence.  Either way is supported.  The
-    /// implementor could decide to always return `true` to ignore the field and
-    /// allow the algorithm to just compare the descendent, or the implementor
-    /// could make the result correspond to whether the values of the field are
-    /// the same or not.
+    /// Requires that the implementor decide whether the value of the `value` field should affect
+    /// equivalence.  Either way is supported.  The implementor could decide to always return
+    /// `true` to ignore the field and allow the algorithm to just compare the descendent, or the
+    /// implementor could make the result correspond to whether the values of the field are the
+    /// same or not.
     ///
     /// Or, e.g. a node type like:
     ///
@@ -121,14 +113,12 @@ pub trait Node
     /// }
     /// ```
     ///
-    /// Requires that the implementor decide whether the difference between the
-    /// `A` and `B` variants should affect equivalence.  Either way is
-    /// supported.  Since both variants have the same amount of edges (assuming
-    /// [`Self::amount_edges`] is implemented like that), the implementor could
-    /// decide to always return `true` to ignore differences in the variants and
-    /// allow the algorithm to just compare the descendents, or the implementor
-    /// could make the result correspond to whether the variants are the same or
-    /// not.
+    /// Requires that the implementor decide whether the difference between the `A` and `B`
+    /// variants should affect equivalence.  Either way is supported.  Since both variants have
+    /// the same amount of edges (assuming [`Self::amount_edges`] is implemented like that), the
+    /// implementor could decide to always return `true` to ignore differences in the variants and
+    /// allow the algorithm to just compare the descendents, or the implementor could make the
+    /// result correspond to whether the variants are the same or not.
     ///
     /// Or, e.g. a node type like:
     ///
@@ -139,42 +129,36 @@ pub trait Node
     /// }
     /// ```
     ///
-    /// It is sufficient to always return `true`, when [`Self::amount_edges`]
-    /// returns `0.into()` for the `A` variant or `1.into()` for the `B`
-    /// variant, because this is used by
-    /// [`Self::equiv_modulo_descendents_then_amount_edges`] and the algorithm
-    /// will detect the unequivalence that way instead.
+    /// It is sufficient to always return `true`, when [`Self::amount_edges`] returns `0.into()`
+    /// for the `A` variant or `1.into()` for the `B` variant, because this is used by
+    /// [`Self::equiv_modulo_descendents_then_amount_edges`] and the algorithm will detect the
+    /// unequivalence that way instead.
     fn equiv_modulo_edges(
         &self,
         other: &Self,
     ) -> bool;
 
-    /// Check if the nodes are equivalent in their own directly-contained
-    /// semantically-significant values ignoring their descendent nodes and
-    /// check if their amounts of edges are similar enough that their
-    /// descendents will need to be checked for equivalence.  If both conditions
-    /// are true, return the amount of edges that the algorithm should descend,
-    /// else return `None`.
+    /// Check if the nodes are equivalent in their own directly-contained semantically-significant
+    /// values ignoring their descendent nodes and check if their amounts of edges are similar
+    /// enough that their descendents will need to be checked for equivalence.  If both conditions
+    /// are true, return the amount of edges that the algorithm should descend, else return
+    /// `None`.
     ///
-    /// The implementor must use [`Self::equiv_modulo_edges`] and
-    /// [`Self::amount_edges`] to check the conditions, but may do so in any
-    /// order.  This allows the implementation to optimize the order to be the
-    /// most efficient for its type.
+    /// The implementor must use [`Self::equiv_modulo_edges`] and [`Self::amount_edges`] to check
+    /// the conditions, but may do so in any order.  This allows the implementation to optimize
+    /// the order to be the most efficient for its type.
     ///
-    /// The implementor must ensure that a `Some(result)` upholds:
-    /// `self.amount_edges() >= result && other.amount_edges() >= result`, so
-    /// that there are enough descendents of each to descend into.
+    /// The implementor must ensure that a `Some(result)` upholds: `self.amount_edges() >= result
+    /// && other.amount_edges() >= result`, so that there are enough descendents of each to
+    /// descend into.
     ///
-    /// The default implementation checks that `self.amount_edges() ==
-    /// other.amount_edges()` and `self.equiv_modulo_edges(other)`, in that
-    /// order, and, when true, returns the amount of edges.  This is intended
-    /// for types where [`Self::amount_edges`] is cheaper than
-    /// [`Self::equiv_modulo_edges`] and so should be checked first, and where
-    /// the nodes should be considered unequivalent if their amounts of edges
-    /// are not the same, and where all the edges should be descended.  For
-    /// types that do not want all of those aspects, a custom implementation
-    /// will need to be provided, and it must fulfill all the above
-    /// requirements.
+    /// The default implementation checks that `self.amount_edges() == other.amount_edges()` and
+    /// `self.equiv_modulo_edges(other)`, in that order, and, when true, returns the amount of
+    /// edges.  This is intended for types where [`Self::amount_edges`] is cheaper than
+    /// [`Self::equiv_modulo_edges`] and so should be checked first, and where the nodes should be
+    /// considered unequivalent if their amounts of edges are not the same, and where all the
+    /// edges should be descended.  For types that do not want all of those aspects, a custom
+    /// implementation will need to be provided, and it must fulfill all the above requirements.
     #[inline]
     fn equiv_modulo_descendents_then_amount_edges(
         &self,
@@ -187,8 +171,8 @@ pub trait Node
 }
 
 
-/// The main equivalence algorithm which can be used for [`PartialEq`]
-/// implementations.  TODO(#10): more about...
+/// The main equivalence algorithm which can be used for [`PartialEq`] implementations.
+/// TODO(#10): more about...
 pub fn precheck_interleave_equiv<N: Node>(
     a: &N,
     b: &N,
@@ -286,12 +270,11 @@ where Self: EquivControl<Node = N>
         let (mut ar, mut br) = (ai.borrow(), bi.borrow());
         let (mut ao, mut bo): (N, N);
 
-        // This loop, when used in conjunction with certain `self.recur` and
-        // `self.next` implementations, is what prevents growing the call-stack,
-        // and so prevents the possibility of stack overflow, when traversing
-        // descendents.  For other implementations where the `self.recur` does
-        // grow the call-stack, the `self.next` always returns `None` and so
-        // this loop is optimized away.
+        // This loop, when used in conjunction with certain `self.recur` and `self.next`
+        // implementations, is what prevents growing the call-stack, and so prevents the
+        // possibility of stack overflow, when traversing descendents.  For other implementations
+        // where the `self.recur` does grow the call-stack, the `self.next` always returns `None`
+        // and so this loop is optimized away.
         loop {
             match self.equiv_main(ar, br) {
                 Ok(true) => (),
@@ -381,13 +364,12 @@ where Self: EquivControl<Node = N>
             // "slow" phase
             SLOW_LIMIT_NEG ..= -1 =>
                 if self.state.as_mut().same_class(&a.id(), &b.id()) {
-                    // This is what prevents traversing descendents that have
-                    // already been checked, which prevents infinite loops on
-                    // cycles and is more efficient on shared structure.  Reset
-                    // the counter so that "slow" will be used for longer, "on
-                    // the theory that if one equivalence is found, more are
-                    // likely to be found" (which is critical for avoiding stack
-                    // overflow with shapes like "degenerate cyclic").
+                    // This is what prevents traversing descendents that have already been
+                    // checked, which prevents infinite loops on cycles and is more efficient on
+                    // shared structure.  Reset the counter so that "slow" will be used for
+                    // longer, "on the theory that if one equivalence is found, more are likely to
+                    // be found" (which is critical for avoiding stack overflow with shapes like
+                    // "degenerate cyclic").
                     self.limit = -1;
                     ControlFlow::Continue(false)
                 }
@@ -397,10 +379,9 @@ where Self: EquivControl<Node = N>
 
             // "slow" limit reached, change to "fast" phase
             _ /* MIN .. SLOW_LIMIT_NEG */ => {
-                // Random limits for "fast" "reduce the likelihood of
-                // repeatedly tripping on worst-case behavior in cases where
-                // the sizes of the input graphs happen to be related to the
-                // chosen bounds in a bad way".
+                // Random limits for "fast" "reduce the likelihood of repeatedly tripping on
+                // worst-case behavior in cases where the sizes of the input graphs happen to be
+                // related to the chosen bounds in a bad way".
                 self.limit = rand_limit(FAST_LIMIT);
                 ControlFlow::Continue(true)
             },
@@ -503,9 +484,8 @@ impl EquivClassChain
         Rc::new(Cell::new(Self::End(rep)))
     }
 
-    /// This type uses `Cell`, instead of `RefCell`, so that panics are
-    /// impossible, which requires the approach of this function because our
-    /// type cannot be `Copy`.
+    /// This type uses `Cell`, instead of `RefCell`, so that panics are impossible, which requires
+    /// the approach of this function because our type cannot be `Copy`.
     fn clone_inner(it: &Rc<Cell<Self>>) -> Self
     {
         let dummy = Self::Next(Rc::clone(it));

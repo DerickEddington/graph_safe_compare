@@ -3,11 +3,10 @@ use std::{
     rc::Rc,
 };
 
-// Note that these derived PartialEq implementations do not do a
-// `cycle_deep_safe_compare` algorithm and are only used for demonstrating the
-// limitations of the derived algorithm.  When `cycle_deep_safe_compare`
-// algorithms are tested against this type, their functions must be called
-// directly.
+// Note that these derived PartialEq implementations do not do a `cycle_deep_safe_compare`
+// algorithm and are only used for demonstrating the limitations of the derived algorithm.  When
+// `cycle_deep_safe_compare` algorithms are tested against this type, their functions must be
+// called directly.
 
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Datum1
