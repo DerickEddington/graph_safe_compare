@@ -26,5 +26,6 @@ pub mod node_types
 pub mod shapes;
 
 
-pub const LONG_LIST_TEST_LENGTH: u32 = if cfg!(debug_assertions) { 1_000_000 } else { 10_000_000 };
+pub const LONG_LIST_TEST_LENGTH: u32 =
+    if cfg!(debug_assertions) { 1_000_000 } else { 10_000_000 };
 pub const DEGENERATE_TEST_DEPTH: u32 = if cfg!(debug_assertions) { 28 } else { 33 };

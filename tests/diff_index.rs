@@ -93,7 +93,14 @@ mod degenerate
     #[test]
     fn dag()
     {
-        tests_utils::eq_case!(identity, DatumAllocator::new, DEPTH + 1, DEPTH, degenerate_dag, My);
+        tests_utils::eq_case!(
+            identity,
+            DatumAllocator::new,
+            DEPTH + 1,
+            DEPTH,
+            degenerate_dag,
+            My
+        );
     }
 
     #[test]
