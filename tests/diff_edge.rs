@@ -1,46 +1,49 @@
 use {
-    cycle_deep_safe_compare::alt::basic::{
-        precheck_interleave_equiv,
-        Node,
-    },
+    cycle_deep_safe_compare::alt::basic::Node,
     std::{
         cell::RefCell,
         rc::Rc,
     },
-    tests_utils::node_types::diff_edge::{
-        Datum1,
-        Datum2,
-        Datum3,
-        Datum4,
+    tests_utils::{
+        node_types::diff_edge::{
+            Datum1,
+            Datum2,
+            Datum3,
+            Datum4,
+        },
+        shapes::{
+            Allocator,
+            Leaf,
+            Pair,
+        },
     },
 };
 
 
 /// New type needed so we can impl the `Node` and `PartialEq` traits on it.
 #[derive(Clone, Debug)]
-enum My
+struct My(Kind);
+
+// Note that these derived PartialEq implementations do not do a
+// `cycle_deep_safe_compare` algorithm and are only used for demonstrating the
+// limitations of the derived algorithm.  When `cycle_deep_safe_compare`
+// algorithms are tested against this type, their functions must be called
+// directly.
+
+#[derive(PartialEq, Eq, Clone, Debug)]
+enum Kind
 {
     A(My1),
     B(My2),
     C(My3),
 }
-#[derive(Clone, Debug)]
-struct My1(Rc<Datum1>);
-#[derive(Clone, Debug)]
-struct My2(Rc<Datum2>);
-#[derive(Clone, Debug)]
-struct My3(Rc<Datum3>);
 
-impl PartialEq for My
-{
-    fn eq(
-        &self,
-        other: &Self,
-    ) -> bool
-    {
-        precheck_interleave_equiv(self, other)
-    }
-}
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct My1(Rc<Datum1>);
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct My2(Rc<Datum2>);
+#[derive(PartialEq, Eq, Clone, Debug)]
+struct My3(Rc<Datum3>);
 
 impl Node for My
 {
@@ -50,18 +53,18 @@ impl Node for My
     fn id(&self) -> Self::Id
     {
         match self {
-            My::A(a) => a.id() as _,
-            My::B(b) => b.id() as _,
-            My::C(c) => c.id() as _,
+            My(Kind::A(a)) => a.id() as _,
+            My(Kind::B(b)) => b.id() as _,
+            My(Kind::C(c)) => c.id() as _,
         }
     }
 
     fn amount_edges(&self) -> Self::Index
     {
         match self {
-            My::A(a) => a.amount_edges(),
-            My::B(b) => b.amount_edges(),
-            My::C(c) => c.amount_edges(),
+            My(Kind::A(a)) => a.amount_edges(),
+            My(Kind::B(b)) => b.amount_edges(),
+            My(Kind::C(c)) => c.amount_edges(),
         }
     }
 
@@ -71,9 +74,9 @@ impl Node for My
     ) -> Self
     {
         match self {
-            My::A(a) => My::B(a.get_edge(index)),
-            My::B(b) => My::C(b.get_edge(index)),
-            My::C(c) => My::A(c.get_edge(index)),
+            My(Kind::A(a)) => My(Kind::B(a.get_edge(index))),
+            My(Kind::B(b)) => My(Kind::C(b.get_edge(index))),
+            My(Kind::C(c)) => My(Kind::A(c.get_edge(index))),
         }
     }
 
@@ -83,9 +86,9 @@ impl Node for My
     ) -> bool
     {
         match (self, other) {
-            (My::A(a1), My::A(a2)) => a1.equiv_modulo_edges(a2),
-            (My::B(b1), My::B(b2)) => b1.equiv_modulo_edges(b2),
-            (My::C(c1), My::C(c2)) => c1.equiv_modulo_edges(c2),
+            (My(Kind::A(a1)), My(Kind::A(a2))) => a1.equiv_modulo_edges(a2),
+            (My(Kind::B(b1)), My(Kind::B(b2))) => b1.equiv_modulo_edges(b2),
+            (My(Kind::C(c1)), My(Kind::C(c2))) => c1.equiv_modulo_edges(c2),
             _ => false,
         }
     }
@@ -208,38 +211,54 @@ impl My3
 }
 
 
-#[test]
-fn rudimentary()
+impl Leaf for Kind
 {
-    let leaf1 = Datum1 { child: None };
-    let leaf2 = Datum1 { child: None };
-    assert_eq!(My::A(My1(Rc::new(leaf1))), My::A(My1(Rc::new(leaf2))));
-}
+    type Alloc = KindAllocator;
 
-
-#[test]
-fn cyclic()
-{
-    fn make_shape() -> My
+    fn new_in(alloc: &Self::Alloc) -> Self
     {
-        let shape = My::A(My1(Rc::new(Datum1 {
-            child: Some(Rc::new(Datum2::Triple(
-                Rc::new(Datum3(RefCell::new(Datum4::End))),
-                Rc::new(Datum3(RefCell::new(Datum4::End))),
-                Rc::new(Datum3(RefCell::new(Datum4::End))),
-            ))),
-        })));
-        if let My::A(my1) = &shape {
-            if let Some(d2) = &my1.0.child {
-                if let Datum2::Triple(d3a, _d3b, d3c) = &**d2 {
-                    *d3a.0.borrow_mut() = Datum4::Link(Rc::clone(&my1.0));
-                    *d3c.0.borrow_mut() = Datum4::Link(Rc::clone(&my1.0));
-                    return shape;
-                }
-            }
-        }
-        unreachable!();
+        alloc.alloc()
     }
-
-    assert_eq!(make_shape(), make_shape());
 }
+
+impl Pair for Kind
+{
+    fn set(
+        &self,
+        a: Self,
+        b: Self,
+    )
+    {
+        match (self, a, b) {
+            (Kind::C(My3(d3)), Kind::C(My3(a)), Kind::C(My3(b))) => {
+                let pair = Datum2::Double(a, b);
+                let d1 = Datum1 { child: Some(Rc::new(pair)) };
+                *d3.0.borrow_mut() = Datum4::Link(Rc::new(d1));
+            },
+            _ => panic!("unsupported"),
+        }
+    }
+}
+
+struct KindAllocator;
+
+impl KindAllocator
+{
+    pub fn new(_size: u32) -> Self
+    {
+        Self
+    }
+}
+
+impl Allocator<Kind> for KindAllocator
+{
+    fn alloc(&self) -> Kind
+    {
+        Kind::C(My3(Rc::new(Datum3(RefCell::new(Datum4::End)))))
+    }
+}
+
+
+use std::convert::identity;
+
+tests_utils::eq_variations_tests!(My, Kind, identity, KindAllocator::new);
