@@ -59,7 +59,7 @@ fn precheck<N: Node>(
 {
     struct Precheck<N>(NextStack<N>);
 
-    impl<N: Node> EquivControl for Equiv<Precheck<N>, N>
+    impl<N: Node> EquivControl for Equiv<Precheck<N>>
     {
         type Node = N;
 
@@ -87,7 +87,7 @@ fn precheck<N: Node>(
         }
     }
 
-    let mut e = Equiv::<_, N>::new(limit, Precheck(NextStack::new()));
+    let mut e = Equiv::new(limit, Precheck(NextStack::<N>::new()));
 
     e.equiv(a, b).map_or(ControlFlow::Continue(()), ControlFlow::Break)
 }
@@ -113,7 +113,7 @@ fn interleave<N: Node>(
         }
     }
 
-    impl<N: Node> EquivControl for Equiv<Interleave<N>, N>
+    impl<N: Node> EquivControl for Equiv<Interleave<N>>
     {
         type Node = N;
 
@@ -141,7 +141,7 @@ fn interleave<N: Node>(
         }
     }
 
-    let mut e = Equiv::<_, N>::new(limit, Interleave {
+    let mut e = Equiv::new(limit, Interleave::<N> {
         equiv_classes: EquivClasses::new(),
         next_stack:    NextStack::new(),
     });

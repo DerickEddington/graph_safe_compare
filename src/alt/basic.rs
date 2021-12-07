@@ -207,9 +207,9 @@ fn precheck<N: Node>(
     limit: i32,
 ) -> ControlFlow<bool, ()>
 {
-    struct Precheck;
+    struct Precheck<N>(PhantomData<N>);
 
-    impl<N: Node> EquivControl for Equiv<Precheck, N>
+    impl<N: Node> EquivControl for Equiv<Precheck<N>>
     {
         type Node = N;
 
@@ -232,7 +232,7 @@ fn precheck<N: Node>(
         }
     }
 
-    let mut e = Equiv::<_, N>::new(limit, Precheck);
+    let mut e = Equiv::new(limit, Precheck::<N>(PhantomData));
 
     e.equiv(a, b).map_or(ControlFlow::Continue(()), ControlFlow::Break)
 }
@@ -260,14 +260,13 @@ trait EquivControl
     }
 }
 
-struct Equiv<S, N>
+struct Equiv<S>
 {
     limit: i32,
     state: S,
-    _node: PhantomData<N>,
 }
 
-impl<S, N: Node> Equiv<S, N>
+impl<S, N: Node> Equiv<S>
 where Self: EquivControl<Node = N>
 {
     fn new(
@@ -275,7 +274,7 @@ where Self: EquivControl<Node = N>
         state: S,
     ) -> Self
     {
-        Self { limit, state, _node: PhantomData }
+        Self { limit, state }
     }
 
     fn equiv<T: Borrow<N>>(
@@ -360,7 +359,8 @@ where Self: EquivControl<Node = N>
 }
 
 
-impl<S: AsMut<EquivClasses<N::Id>>, N: Node> Equiv<S, N>
+impl<S: AsMut<EquivClasses<N::Id>>, N: Node> Equiv<S>
+where Self: EquivControl<Node = N>
 {
     fn do_descend_slow_or_fast(
         &mut self,
@@ -415,17 +415,17 @@ fn interleave<N: Node>(
     limit: i32,
 ) -> bool
 {
-    struct Interleave<I>(EquivClasses<I>);
+    struct Interleave<N: Node>(EquivClasses<N::Id>);
 
-    impl<I> AsMut<EquivClasses<I>> for Interleave<I>
+    impl<N: Node> AsMut<EquivClasses<N::Id>> for Interleave<N>
     {
-        fn as_mut(&mut self) -> &mut EquivClasses<I>
+        fn as_mut(&mut self) -> &mut EquivClasses<N::Id>
         {
             &mut self.0
         }
     }
 
-    impl<N: Node> EquivControl for Equiv<Interleave<N::Id>, N>
+    impl<N: Node> EquivControl for Equiv<Interleave<N>>
     {
         type Node = N;
 
@@ -448,7 +448,7 @@ fn interleave<N: Node>(
         }
     }
 
-    let mut e = Equiv::<_, N>::new(limit, Interleave(EquivClasses::new()));
+    let mut e = Equiv::new(limit, Interleave::<N>(EquivClasses::new()));
     matches!(e.equiv(a, b), Ok(true))
 }
 
@@ -715,9 +715,9 @@ mod tests
             limit: i32,
         ) -> ResultLimit
         {
-            struct State;
+            struct State<N>(PhantomData<N>);
 
-            impl<N: Node> EquivControl for Equiv<State, N>
+            impl<N: Node> EquivControl for Equiv<State<N>>
             {
                 type Node = N;
 
@@ -740,7 +740,7 @@ mod tests
                 }
             }
 
-            let mut e = Equiv::<_, &Datum>::new(limit, State);
+            let mut e = Equiv::new(limit, State::<&Datum>(PhantomData));
 
             match e.equiv(a, b) {
                 Ok(true) => True(e.limit),
