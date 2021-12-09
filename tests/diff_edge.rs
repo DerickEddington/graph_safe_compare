@@ -20,7 +20,6 @@ use {
 };
 
 
-/// New type needed so we can impl the `Node` and `PartialEq` traits on it.
 #[derive(Clone, Debug)]
 struct My(Kind);
 

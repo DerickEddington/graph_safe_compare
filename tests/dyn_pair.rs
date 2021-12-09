@@ -1,8 +1,5 @@
 use {
-    cycle_deep_safe_compare::alt::basic::{
-        precheck_interleave_equiv,
-        Node,
-    },
+    cycle_deep_safe_compare::alt::basic::Node,
     std::any::Any,
     tests_utils::{
         node_types::dyn_pair::{
@@ -19,17 +16,6 @@ use {
 
 #[derive(Debug)]
 struct My(DatumRef);
-
-impl PartialEq for My
-{
-    fn eq(
-        &self,
-        other: &Self,
-    ) -> bool
-    {
-        precheck_interleave_equiv(self, other)
-    }
-}
 
 impl Node for My
 {
