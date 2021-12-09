@@ -1,6 +1,8 @@
 use {
     cycle_deep_safe_compare::alt::basic::{
         precheck_interleave_equiv,
+        robust::VecStack,
+        CallStack,
         Node,
     },
     std::{
@@ -30,7 +32,10 @@ impl PartialEq for My
         other: &Self,
     ) -> bool
     {
-        precheck_interleave_equiv(self, other)
+        let callstack = precheck_interleave_equiv::<_, CallStack, CallStack>(self, other);
+        let vecstack = precheck_interleave_equiv::<_, VecStack<_>, VecStack<_>>(self, other);
+        assert_eq!(callstack, vecstack);
+        callstack
     }
 }
 

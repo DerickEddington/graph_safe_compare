@@ -235,7 +235,10 @@ macro_rules! eq_variations_tests
         mod callstack
         {
             $crate::eq_variation_mod_body!(
-                cycle_deep_safe_compare::alt::basic::precheck_interleave_equiv,
+                cycle_deep_safe_compare::alt::basic::precheck_interleave_equiv::<
+                    _,
+                    cycle_deep_safe_compare::alt::basic::CallStack,
+                    cycle_deep_safe_compare::alt::basic::CallStack>,
                 $my_type, $datum_type, $alloc_trans, $make_alloc);
 
             $crate::eq_tests!($alloc_trans, $make_alloc, MyEq::new,
@@ -248,7 +251,10 @@ macro_rules! eq_variations_tests
         mod robust
         {
             $crate::eq_variation_mod_body!(
-                cycle_deep_safe_compare::alt::basic::robust::precheck_interleave_equiv,
+                cycle_deep_safe_compare::alt::basic::precheck_interleave_equiv::<
+                    _,
+                    cycle_deep_safe_compare::alt::basic::CallStack,
+                    cycle_deep_safe_compare::alt::basic::robust::VecStack<_>>,
                 $my_type, $datum_type, $alloc_trans, $make_alloc);
 
             tests_utils::eq_tests!($alloc_trans, $make_alloc, MyEq::new,

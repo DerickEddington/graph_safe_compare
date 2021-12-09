@@ -173,94 +173,102 @@ pub trait Node
 
 /// The main equivalence algorithm which can be used for [`PartialEq`] implementations.
 /// TODO(#10): more about...
-pub fn precheck_interleave_equiv<N: Node>(
+pub fn precheck_interleave_equiv<N: Node, SP: Default + Reset + Into<SI>, SI>(
     a: &N,
     b: &N,
 ) -> bool
+where
+    Equiv<Precheck<N>, SP>: Descend<Node = N> + Recur<Node = N>,
+    Equiv<Interleave<N>, SI>: Descend<Node = N> + Recur<Node = N>,
 {
-    match precheck(a, b, PRE_LIMIT.into()) {
+    let mut e = Equiv::<Precheck<N>, SP>::new();
+
+    match e.precheck_equiv(a, b) {
         ControlFlow::Break(result) => result,
-        ControlFlow::Continue(()) => interleave(a, b, -1),
+        ControlFlow::Continue(()) => {
+            let mut e: Equiv<Interleave<N>, SI> = e.into();
+            e.interleave_equiv(a, b)
+        },
     }
 }
 
 
-fn precheck<N: Node>(
-    a: &N,
-    b: &N,
-    limit: i32,
-) -> ControlFlow<bool, ()>
-{
-    struct Precheck<N>(PhantomData<N>);
+use private::{
+    Descend,
+    Equiv,
+    Interleave,
+    Precheck,
+    Recur,
+    Reset,
+};
 
-    impl<N: Node> EquivControl for Equiv<Precheck<N>>
+/// `precheck_interleave_equiv` is `pub` and exposes these items, so they must also be `pub`, but
+/// we can still make them private by this other way of placing them in a private module.
+mod private
+{
+    use super::{
+        ControlFlow,
+        EquivClasses,
+        Node,
+        PhantomData,
+    };
+
+    pub trait Descend
     {
-        type Node = N;
+        type Node: Node;
 
         fn do_descend(
             &mut self,
-            _a: &N,
-            _b: &N,
-        ) -> ControlFlow<(), bool>
-        {
-            self.do_descend_above_limit()
-        }
+            a: &Self::Node,
+            b: &Self::Node,
+        ) -> ControlFlow<(), bool>;
+    }
+
+    pub trait Recur
+    {
+        type Node: Node;
 
         fn recur(
             &mut self,
-            a: N,
-            b: N,
-        ) -> Result<bool, ()>
+            a: Self::Node,
+            b: Self::Node,
+        ) -> Result<bool, ()>;
+
+        fn next(&mut self) -> Option<(Self::Node, Self::Node)>
         {
-            self.recur_on_callstack(a, b)
+            None
         }
     }
 
-    let mut e = Equiv::new(limit, Precheck::<N>(PhantomData));
-
-    e.equiv(a, b).map_or(ControlFlow::Continue(()), ControlFlow::Break)
-}
-
-
-trait EquivControl
-{
-    type Node: Node;
-
-    fn do_descend(
-        &mut self,
-        a: &Self::Node,
-        b: &Self::Node,
-    ) -> ControlFlow<(), bool>;
-
-    fn recur(
-        &mut self,
-        a: Self::Node,
-        b: Self::Node,
-    ) -> Result<bool, ()>;
-
-    fn next(&mut self) -> Option<(Self::Node, Self::Node)>
+    pub trait Reset
     {
-        None
+        fn reset(self) -> Self;
+    }
+
+    // TODO: Could the pub(crate) be stricter, like pub(super), after reorganizing into modules?
+
+    pub struct Precheck<N>
+    {
+        pub(crate) _node_type: PhantomData<N>,
+    }
+
+    pub struct Interleave<N: Node>
+    {
+        pub(crate) equiv_classes: EquivClasses<N::Id>,
+    }
+
+    pub struct Equiv<P, S>
+    {
+        pub(crate) limit:       i32,
+        pub(crate) phase:       P,
+        pub(crate) recur_stack: S,
     }
 }
 
-struct Equiv<S>
-{
-    limit: i32,
-    state: S,
-}
 
-impl<S, N: Node> Equiv<S>
-where Self: EquivControl<Node = N>
+impl<N: Node, P, S> Equiv<P, S>
+where Self: Descend<Node = N> + Recur<Node = N>
 {
-    fn new(
-        limit: i32,
-        state: S,
-    ) -> Self
-    {
-        Self { limit, state }
-    }
-
     fn equiv<T: Borrow<N>>(
         &mut self,
         ai: T,
@@ -325,16 +333,30 @@ where Self: EquivControl<Node = N>
         }
         Ok(true)
     }
+}
 
-    fn do_descend_above_limit(&mut self) -> ControlFlow<(), bool>
+
+#[derive(Default)]
+#[allow(clippy::exhaustive_structs)]
+pub struct CallStack;
+
+impl Reset for CallStack
+{
+    fn reset(self) -> Self
     {
-        if self.limit > 0 { ControlFlow::Continue(true) } else { ControlFlow::Break(()) }
+        self
     }
+}
 
-    fn recur_on_callstack(
+impl<N: Node, P> Recur for Equiv<P, CallStack>
+where Self: Descend<Node = N>
+{
+    type Node = N;
+
+    fn recur(
         &mut self,
-        a: N,
-        b: N,
+        a: Self::Node,
+        b: Self::Node,
     ) -> Result<bool, ()>
     {
         self.equiv(a, b)
@@ -342,13 +364,80 @@ where Self: EquivControl<Node = N>
 }
 
 
-impl<S: AsMut<EquivClasses<N::Id>>, N: Node> Equiv<S>
-where Self: EquivControl<Node = N>
+impl<N, S: Default> Equiv<Precheck<N>, S>
 {
-    fn do_descend_slow_or_fast(
+    fn new() -> Self
+    {
+        Self::new_with_limit(PRE_LIMIT.into())
+    }
+
+    fn new_with_limit(limit: i32) -> Self
+    {
+        Self { limit, phase: Precheck { _node_type: PhantomData }, recur_stack: S::default() }
+    }
+}
+
+impl<N: Node, S> Equiv<Precheck<N>, S>
+where Self: Descend<Node = N> + Recur<Node = N>
+{
+    fn precheck_equiv(
         &mut self,
         a: &N,
         b: &N,
+    ) -> ControlFlow<bool, ()>
+    {
+        self.equiv(a, b).map_or(ControlFlow::Continue(()), ControlFlow::Break)
+    }
+}
+
+impl<N: Node, S> Descend for Equiv<Precheck<N>, S>
+{
+    type Node = N;
+
+    fn do_descend(
+        &mut self,
+        _a: &N,
+        _b: &N,
+    ) -> ControlFlow<(), bool>
+    {
+        if self.limit > 0 { ControlFlow::Continue(true) } else { ControlFlow::Break(()) }
+    }
+}
+
+
+impl<N: Node, SP: Reset + Into<SI>, SI> From<Equiv<Precheck<N>, SP>> for Equiv<Interleave<N>, SI>
+{
+    fn from(prechecker: Equiv<Precheck<N>, SP>) -> Self
+    {
+        Self {
+            limit:       -1,
+            phase:       Interleave { equiv_classes: EquivClasses::new() },
+            recur_stack: prechecker.recur_stack.reset().into(),
+        }
+    }
+}
+
+impl<N: Node, S> Equiv<Interleave<N>, S>
+where Self: Descend<Node = N> + Recur<Node = N>
+{
+    fn interleave_equiv(
+        &mut self,
+        a: &N,
+        b: &N,
+    ) -> bool
+    {
+        matches!(self.equiv(a, b), Ok(true))
+    }
+}
+
+impl<N: Node, S> Descend for Equiv<Interleave<N>, S>
+{
+    type Node = N;
+
+    fn do_descend(
+        &mut self,
+        a: &Self::Node,
+        b: &Self::Node,
     ) -> ControlFlow<(), bool>
     {
         fn rand_limit(max: u16) -> i32
@@ -358,12 +447,12 @@ where Self: EquivControl<Node = N>
 
         match self.limit {
 
-            // "fast" phase
+            // "fast" mode
             0 .. => ControlFlow::Continue(true),
 
-            // "slow" phase
+            // "slow" mode
             SLOW_LIMIT_NEG ..= -1 =>
-                if self.state.as_mut().same_class(&a.id(), &b.id()) {
+                if self.phase.equiv_classes.same_class(&a.id(), &b.id()) {
                     // This is what prevents traversing descendents that have already been
                     // checked, which prevents infinite loops on cycles and is more efficient on
                     // shared structure.  Reset the counter so that "slow" will be used for
@@ -377,7 +466,7 @@ where Self: EquivControl<Node = N>
                 ControlFlow::Continue(true)
             },
 
-            // "slow" limit reached, change to "fast" phase
+            // "slow" limit reached, change to "fast" mode
             _ /* MIN .. SLOW_LIMIT_NEG */ => {
                 // Random limits for "fast" "reduce the likelihood of repeatedly tripping on
                 // worst-case behavior in cases where the sizes of the input graphs happen to be
@@ -390,51 +479,7 @@ where Self: EquivControl<Node = N>
 }
 
 
-fn interleave<N: Node>(
-    a: &N,
-    b: &N,
-    limit: i32,
-) -> bool
-{
-    struct Interleave<N: Node>(EquivClasses<N::Id>);
-
-    impl<N: Node> AsMut<EquivClasses<N::Id>> for Interleave<N>
-    {
-        fn as_mut(&mut self) -> &mut EquivClasses<N::Id>
-        {
-            &mut self.0
-        }
-    }
-
-    impl<N: Node> EquivControl for Equiv<Interleave<N>>
-    {
-        type Node = N;
-
-        fn do_descend(
-            &mut self,
-            a: &N,
-            b: &N,
-        ) -> ControlFlow<(), bool>
-        {
-            self.do_descend_slow_or_fast(a, b)
-        }
-
-        fn recur(
-            &mut self,
-            a: N,
-            b: N,
-        ) -> Result<bool, ()>
-        {
-            self.recur_on_callstack(a, b)
-        }
-    }
-
-    let mut e = Equiv::new(limit, Interleave::<N>(EquivClasses::new()));
-    matches!(e.equiv(a, b), Ok(true))
-}
-
-
-struct EquivClasses<Key>
+pub(crate) struct EquivClasses<Key>
 {
     map: HashMap<Key, Rc<Cell<EquivClassChain>>>,
 }
@@ -695,32 +740,7 @@ mod tests
             limit: i32,
         ) -> ResultLimit
         {
-            struct State<N>(PhantomData<N>);
-
-            impl<N: Node> EquivControl for Equiv<State<N>>
-            {
-                type Node = N;
-
-                fn do_descend(
-                    &mut self,
-                    _a: &N,
-                    _b: &N,
-                ) -> ControlFlow<(), bool>
-                {
-                    self.do_descend_above_limit()
-                }
-
-                fn recur(
-                    &mut self,
-                    a: N,
-                    b: N,
-                ) -> Result<bool, ()>
-                {
-                    self.recur_on_callstack(a, b)
-                }
-            }
-
-            let mut e = Equiv::new(limit, State::<&Datum>(PhantomData));
+            let mut e = Equiv::<Precheck<&Datum>, CallStack>::new_with_limit(limit);
 
             match e.equiv(a, b) {
                 Ok(true) => True(e.limit),
