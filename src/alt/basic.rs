@@ -207,7 +207,6 @@ use private::{
 mod private
 {
     use super::{
-        ControlFlow,
         EquivClasses,
         Node,
         PhantomData,
@@ -217,11 +216,19 @@ mod private
     {
         type Node: Node;
 
-        fn do_descend(
+        fn do_edges(
             &mut self,
-            a: &Self::Node,
-            b: &Self::Node,
-        ) -> ControlFlow<(), bool>;
+            _a: &Self::Node,
+            _b: &Self::Node,
+        ) -> bool
+        {
+            true
+        }
+
+        fn do_recur(&mut self) -> bool
+        {
+            true
+        }
     }
 
     pub trait Recur
@@ -234,10 +241,7 @@ mod private
             b: Self::Node,
         ) -> Result<bool, ()>;
 
-        fn next(&mut self) -> Option<(Self::Node, Self::Node)>
-        {
-            None
-        }
+        fn next(&mut self) -> Option<(Self::Node, Self::Node)>;
     }
 
     pub trait Reset
@@ -311,20 +315,20 @@ where Self: Descend<Node = N> + Recur<Node = N>
         }
         else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b) {
             let mut i = 0.into();
-            if i < amount_edges {
-                match self.do_descend(a, b) {
-                    ControlFlow::Continue(true) =>
-                        while i < amount_edges {
-                            let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
-                            self.limit = self.limit.saturating_sub(1);
-                            match self.recur(ae, be) {
-                                Ok(true) => (),
-                                result => return result,
-                            }
-                            i += 1.into();
-                        },
-                    ControlFlow::Continue(false) => (),
-                    ControlFlow::Break(()) => return Err(()),
+            if i < amount_edges && self.do_edges(a, b) {
+                while i < amount_edges {
+                    self.limit = self.limit.saturating_sub(1);
+                    if self.do_recur() {
+                        let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
+                        match self.recur(ae, be) {
+                            Ok(true) => (),
+                            result => return result,
+                        }
+                    }
+                    else {
+                        return Err(());
+                    }
+                    i += 1.into();
                 }
             }
         }
@@ -359,7 +363,12 @@ where Self: Descend<Node = N>
         b: Self::Node,
     ) -> Result<bool, ()>
     {
-        self.equiv(a, b)
+        self.equiv_main(&a, &b)
+    }
+
+    fn next(&mut self) -> Option<(Self::Node, Self::Node)>
+    {
+        None
     }
 }
 
@@ -394,13 +403,9 @@ impl<N: Node, S> Descend for Equiv<Precheck<N>, S>
 {
     type Node = N;
 
-    fn do_descend(
-        &mut self,
-        _a: &N,
-        _b: &N,
-    ) -> ControlFlow<(), bool>
+    fn do_recur(&mut self) -> bool
     {
-        if self.limit > 0 { ControlFlow::Continue(true) } else { ControlFlow::Break(()) }
+        self.limit >= 0
     }
 }
 
@@ -434,11 +439,11 @@ impl<N: Node, S> Descend for Equiv<Interleave<N>, S>
 {
     type Node = N;
 
-    fn do_descend(
+    fn do_edges(
         &mut self,
         a: &Self::Node,
         b: &Self::Node,
-    ) -> ControlFlow<(), bool>
+    ) -> bool
     {
         fn rand_limit(max: u16) -> i32
         {
@@ -448,7 +453,7 @@ impl<N: Node, S> Descend for Equiv<Interleave<N>, S>
         match self.limit {
 
             // "fast" mode
-            0 .. => ControlFlow::Continue(true),
+            0 .. => true,
 
             // "slow" mode
             SLOW_LIMIT_NEG ..= -1 =>
@@ -460,11 +465,11 @@ impl<N: Node, S> Descend for Equiv<Interleave<N>, S>
                     // be found" (which is critical for avoiding stack overflow with shapes like
                     // "degenerate cyclic").
                     self.limit = -1;
-                    ControlFlow::Continue(false)
+                    false
                 }
-            else {
-                ControlFlow::Continue(true)
-            },
+                else {
+                    true
+                },
 
             // "slow" limit reached, change to "fast" mode
             _ /* MIN .. SLOW_LIMIT_NEG */ => {
@@ -472,7 +477,7 @@ impl<N: Node, S> Descend for Equiv<Interleave<N>, S>
                 // worst-case behavior in cases where the sizes of the input graphs happen to be
                 // related to the chosen bounds in a bad way".
                 self.limit = rand_limit(FAST_LIMIT);
-                ControlFlow::Continue(true)
+                true
             },
         }
     }
@@ -757,7 +762,8 @@ mod tests
         assert_eq!(eqv(&end_pair(), &leaf(), 42), False(42));
         assert_eq!(eqv(&end_pair(), &end_pair(), 7), True(5));
         assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 7), True(3));
-        assert_eq!(eqv(&end_pair(), &end_pair(), 0), Abort(0));
+        assert_eq!(eqv(&end_pair(), &end_pair(), 0), Abort(-1));
+        assert_eq!(eqv(&end_pair(), &end_pair(), 1), Abort(-1));
         assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 1), Abort(-1));
         assert_eq!(eqv(&pair(leaf(), leaf()), &pair(leaf(), end_pair()), 42), False(40));
         assert_eq!(
