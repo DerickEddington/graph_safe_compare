@@ -1,5 +1,5 @@
 use {
-    cycle_deep_safe_compare::alt::basic::Node,
+    cycle_deep_safe_compare::Node,
     std::{
         cell::RefCell,
         rc::Rc,

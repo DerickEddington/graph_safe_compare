@@ -8,5 +8,5 @@ use {
     tests_utils::node_types::rc_pair::DatumAllocator,
 };
 
-tests_utils::eq_tests!(identity, DatumAllocator::new, identity,
-                       #[ignore], #[ignore], #[cfg(any())]);
+tests_utils::eq_shapes_tests!(identity, DatumAllocator::new, identity, 
+                              #[ignore], #[ignore]);

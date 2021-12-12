@@ -1,6 +1,9 @@
 //! Things useful to both unit tests and integration tests.
 //! TODO: And benchmarks?
 
+#![forbid(unsafe_code)]
+
+
 pub mod cases
 {
     use std::mem::ManuallyDrop;

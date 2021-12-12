@@ -1,8 +1,8 @@
 use {
-    cycle_deep_safe_compare::alt::basic::{
-        precheck_interleave_equiv,
-        robust::VecStack,
-        CallStack,
+    cycle_deep_safe_compare::{
+        basic::recursion::callstack::CallStack,
+        deep_safe::recursion::vecstack::VecStack,
+        generic::precheck_interleave_equiv,
         Node,
     },
     std::{

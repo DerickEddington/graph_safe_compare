@@ -16,8 +16,12 @@ macro_rules! eq_case {
         let make2 = $crate::shapes::PairChainMaker::new_with($shape_size, alloc2);
         let ddag2 = make2.$shape_method();
 
-        assert_eq!(
-            $crate::cases::NoDrop(std::mem::ManuallyDrop::new($datum_trans(ddag1))),
+        // TODO: With assert_eq!, failures try to format the values, but there are some huge
+        // values for which this tries to consume all memory just to format. Need the Debug impls
+        // to limit how big of a formatted string they generate or something.
+        assert!(
+            $crate::cases::NoDrop(std::mem::ManuallyDrop::new($datum_trans(ddag1)))
+            ==
             $crate::cases::NoDrop(std::mem::ManuallyDrop::new($datum_trans(ddag2)))
         );
     };
@@ -25,15 +29,14 @@ macro_rules! eq_case {
 
 
 #[macro_export]
-macro_rules! eq_tests
+macro_rules! eq_shapes_tests
 {
     (
         $alloc_trans:tt,
         $make_alloc:expr,
         $datum_trans:expr,
         #[$maybe_ignore_needs_our_algo:meta],
-        #[$maybe_ignore_stack_overflow:meta],
-        #[$maybe_omit_derived:meta]
+        #[$maybe_ignore_stack_overflow:meta]
     ) => {
         #[cfg(test)]
         mod degenerate
@@ -73,6 +76,7 @@ macro_rules! eq_tests
                 use super::*;
 
                 #[test]
+                #[$maybe_ignore_needs_our_algo]
                 #[$maybe_ignore_stack_overflow]
                 fn dag_stack_overflow()
                 {
@@ -89,6 +93,7 @@ macro_rules! eq_tests
                 }
 
                 #[test]
+                #[$maybe_ignore_needs_our_algo]
                 #[$maybe_ignore_stack_overflow]
                 fn cyclic_stack_overflow()
                 {
@@ -101,43 +106,6 @@ macro_rules! eq_tests
                         DEPTH,
                         degenerate_cyclic,
                         $datum_trans
-                    );
-                }
-            }
-
-            #[$maybe_omit_derived]
-            mod derived_eq
-            {
-                use {
-                    super::*,
-                    std::convert::identity,
-                };
-
-                #[test]
-                #[ignore]
-                fn dag_slow()
-                {
-                    $crate::eq_case!(
-                        $alloc_trans,
-                        $make_alloc,
-                        $crate::DEGENERATE_TEST_DEPTH + 1,
-                        $crate::DEGENERATE_TEST_DEPTH,
-                        degenerate_dag,
-                        identity
-                    );
-                }
-
-                #[test]
-                #[ignore]
-                fn cyclic_stack_overflow()
-                {
-                    $crate::eq_case!(
-                        $alloc_trans,
-                        $make_alloc,
-                        $crate::DEGENERATE_TEST_DEPTH + 1,
-                        $crate::DEGENERATE_TEST_DEPTH,
-                        degenerate_cyclic,
-                        identity
                     );
                 }
             }
@@ -229,36 +197,178 @@ macro_rules! eq_variations_tests
     ($my_type:ty, $datum_type:ty, $alloc_trans:tt, $make_alloc:expr)
         =>
     {
-        /// Use the variation of the algorithm that uses the normal function call stack and so
-        /// cannot handle very-deep graphs because stack overflow can happen.
         #[cfg(test)]
-        mod callstack
+        mod derived_eq
         {
-            $crate::eq_variation_mod_body!(
-                cycle_deep_safe_compare::alt::basic::precheck_interleave_equiv::<
-                    _,
-                    cycle_deep_safe_compare::alt::basic::CallStack,
-                    cycle_deep_safe_compare::alt::basic::CallStack>,
-                $my_type, $datum_type, $alloc_trans, $make_alloc);
+            use super::*;
 
-            $crate::eq_tests!($alloc_trans, $make_alloc, MyEq::new,
-                              #[cfg(all())], #[ignore], #[cfg(all())]);
+            #[test]
+            #[ignore]
+            fn dag_slow()
+            {
+                $crate::eq_case!(
+                    $alloc_trans,
+                    $make_alloc,
+                    $crate::DEGENERATE_TEST_DEPTH + 1,
+                    $crate::DEGENERATE_TEST_DEPTH,
+                    degenerate_dag,
+                    std::convert::identity
+                );
+            }
+
+            #[test]
+            #[ignore]
+            fn cyclic_stack_overflow()
+            {
+                $crate::eq_case!(
+                    $alloc_trans,
+                    $make_alloc,
+                    $crate::DEGENERATE_TEST_DEPTH + 1,
+                    $crate::DEGENERATE_TEST_DEPTH,
+                    degenerate_cyclic,
+                    std::convert::identity
+                );
+            }
         }
 
-        /// Use the variation of the algorithm that does not use the call stack and that can
-        /// handle very-deep graphs and stack overflow cannot happen.
+        #[cfg(test)]
+        mod basic
+        {
+            use super::*;
+
+            mod unlimited
+            {
+                $crate::eq_variation_mod_body!(
+                    cycle_deep_safe_compare::basic::equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[ignore], #[ignore]);
+            }
+
+            fn limited_equiv<N: cycle_deep_safe_compare::Node>(
+                a: &N,
+                b: &N,
+            ) -> bool
+            {
+                const LIMIT: i32 = 50;
+                matches!(cycle_deep_safe_compare::basic::limited_equiv(LIMIT, a, b), Ok(true))
+            }
+
+            mod limited
+            {
+                $crate::eq_variation_mod_body!(
+                    super::limited_equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[ignore], #[ignore]);
+            }
+        }
+
+        #[cfg(test)]
+        mod cycle_safe
+        {
+            use super::*;
+
+            mod interleave
+            {
+                $crate::eq_variation_mod_body!(
+                    cycle_deep_safe_compare::cycle_safe::equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[cfg(all())], #[ignore]);
+            }
+
+            mod precheck_interleave
+            {
+                $crate::eq_variation_mod_body!(
+                    cycle_deep_safe_compare::cycle_safe::precheck_equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[cfg(all())], #[ignore]);
+            }
+        }
+
+        #[cfg(test)]
+        mod deep_safe
+        {
+            use super::*;
+
+            mod vecstack
+            {
+                $crate::eq_variation_mod_body!(
+                    cycle_deep_safe_compare::deep_safe::equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[ignore], #[cfg(all())]);
+            }
+        }
+
         #[cfg(test)]
         mod robust
         {
-            $crate::eq_variation_mod_body!(
-                cycle_deep_safe_compare::alt::basic::precheck_interleave_equiv::<
-                    _,
-                    cycle_deep_safe_compare::alt::basic::CallStack,
-                    cycle_deep_safe_compare::alt::basic::robust::VecStack<_>>,
-                $my_type, $datum_type, $alloc_trans, $make_alloc);
+            use super::*;
 
-            tests_utils::eq_tests!($alloc_trans, $make_alloc, MyEq::new,
-                                   #[cfg(all())], #[cfg(all())], #[cfg(any())]);
+            mod interleave_vecstack
+            {
+                $crate::eq_variation_mod_body!(
+                    cycle_deep_safe_compare::robust::equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[cfg(all())], #[cfg(all())]);
+            }
+
+            mod precheck_interleave_vecstack
+            {
+                $crate::eq_variation_mod_body!(
+                    cycle_deep_safe_compare::robust::precheck_equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[cfg(all())], #[cfg(all())]);
+            }
         }
+
+        #[cfg(test)]
+        mod generic
+        {
+            use super::*;
+
+            /// Use the call-stack for the precheck since that is limited and will not overflow
+            /// the stack when the stack is already shallow, and use the vector-stack for the
+            /// interleave so great depth is supported since an input could be very-deep.
+            fn precheck_interleave_equiv<N: cycle_deep_safe_compare::Node>(
+                a: &N,
+                b: &N,
+            ) -> bool
+            {
+                use cycle_deep_safe_compare::{
+                    basic::recursion::callstack::CallStack,
+                    deep_safe::recursion::vecstack::VecStack,
+                    generic,
+                };
+
+                generic::precheck_interleave_equiv::<_, CallStack, VecStack<_>>(a, b)
+            }
+
+            mod precheck_interleave_callstack_vecstack
+            {
+                $crate::eq_variation_mod_body!(
+                    super::precheck_interleave_equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[cfg(all())], #[cfg(all())]);
+            }
+
+            // TODO: In the future, when the known-equivalent table is made generic, seems like
+            // should add tests of using that for customization here.
+        }
+
     };
 }

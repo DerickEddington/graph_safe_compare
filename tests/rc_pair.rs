@@ -1,5 +1,5 @@
 use {
-    cycle_deep_safe_compare::alt::basic::Node,
+    cycle_deep_safe_compare::Node,
     std::rc::Rc,
     tests_utils::{
         node_types::rc_pair::{
