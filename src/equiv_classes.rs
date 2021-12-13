@@ -5,11 +5,11 @@
 //!
 //! The mechanism that acheives this is a table that associates nodes by ID with a representation
 //! of equivalence classes that is optimized for its needed operations of making a union of
-//! classes by merging the paths to it and of checking if nodes are members of the same class by
-//! following the paths to it.  (It is not needed to be able to iterate the members of a given
+//! classes by merging the links to it and of checking if nodes are members of the same class by
+//! following the links to it.  (It is not needed to be able to iterate the members of a given
 //! class, and the type cannot do that.)
 //!
-//! For the internal representations, interior mutability is required due to requiring shared
+//! For the internal representation, interior mutability is required due to requiring shared
 //! ownership and multiple borrows.  [`Cell`] is used because failures are impossible with it
 //! (unlike [`RefCell`](core::cell::RefCell)).
 
@@ -28,92 +28,81 @@ use {
 };
 
 
-/// An equivalence class.
-///
-/// Distinct values of this type represent distinct equivalence classes.
-#[derive(Copy, Clone, Debug)]
-struct Class
-{
-    /// Determines which `Class` a node is merged into when being recorded as equivalent to
-    /// another node when both nodes had already been seen separately.
-    weight: usize,
-}
-
-impl Class
-{
-    fn default() -> Rc<Cell<Self>>
-    {
-        Rc::new(Cell::new(Class { weight: 1 }))
-    }
-}
-
-/// Using [`ptr::eq`] for this makes distinct values of this type represent distinct equivalence
-/// classes.
-impl PartialEq for Class
-{
-    fn eq(
-        &self,
-        other: &Self,
-    ) -> bool
-    {
-        ptr::eq(self, other)
-    }
-}
-impl Eq for Class {}
-
-
 /// Membership in an equivalence class.
 ///
 /// Optimized for merging with other classes and for checking membership in the same class.
 #[derive(Clone)]
-enum Membership
+enum Class
 {
-    End(Rc<Cell<Class>>),
-    Chain(Rc<Cell<Self>>),
+    /// An equivalence class.
+    ///
+    /// Distinct objects of this variant represent distinct equivalence classes.
+    Representative
+    {
+        /// Determines which `Representative` object is merged when nodes are recorded as
+        /// equivalent when both had already been seen separately.
+        weight: usize,
+    },
+    /// A merger with another equivalence class.
+    ///
+    /// This makes all nodes in our class be equivalent to all nodes in the other class, by
+    /// transitivity.
+    Link
+    {
+        /// The other class that we merged with.
+        next: Rc<Cell<Self>>,
+    },
 }
 
-impl Membership
+impl Default for Class
 {
-    fn default() -> Rc<Cell<Self>>
+    fn default() -> Self
     {
-        Membership::new(Class::default())
+        Self::Representative { weight: 1 }
     }
+}
 
-    fn new(class: Rc<Cell<Class>>) -> Rc<Cell<Self>>
+impl Class
+{
+    /// Create a distinct [`Representative`](Self::Representative) object that represents a
+    /// distinct equivalence class, with initial weight.
+    fn new() -> Rc<Cell<Self>>
     {
-        Rc::new(Cell::new(Self::End(class)))
+        Rc::new(Cell::new(Self::default()))
     }
 
     /// This type uses `Cell`, instead of `RefCell`, so that failures are impossible, which
     /// requires the approach of this function because our type cannot be `Copy`.
     fn clone_inner(it: &Rc<Cell<Self>>) -> Self
     {
-        let dummy = Self::Chain(Rc::clone(it));
+        let dummy = Self::default();
         let inner = it.replace(dummy);
         let result = inner.clone();
         it.set(inner);
         result
     }
 
-    /// Get the equivalence class `it` is a member of currently.
+    /// Get the representative, and its weight, of the equivalence class `it` is a member of
+    /// currently.
     ///
-    /// Follows the chain path to the distinct `Class` value.  Long paths are shortened, to
-    /// improve efficiency for subsequent traversals.
-    fn class(it: &Rc<Cell<Self>>) -> Rc<Cell<Class>>
+    /// Follows [`Link`](Self::Link) chains to the distinct
+    /// [`Representative`](Self::Representative) object.  Long chains are shortened, to improve
+    /// efficiency for subsequent traversals.
+    fn get_rep_and_weight(it: &Rc<Cell<Self>>) -> (Rc<Cell<Self>>, usize)
     {
         let it_inner = Self::clone_inner(it);
         match it_inner {
-            Self::End(class) => class,
+            Self::Representative { weight } => (Rc::clone(it), weight),
 
-            Self::Chain(mut next) => {
+            Self::Link { mut next } => {
                 let mut cur = Rc::clone(it);
                 loop {
                     let next_inner = Self::clone_inner(&next);
                     match next_inner {
-                        Self::End(class) => break class,
+                        Self::Representative { weight } => break (next, weight),
 
-                        Self::Chain(next_next) => {
-                            cur.set(Self::Chain(Rc::clone(&next_next)));
+                        Self::Link { next: next_next } => {
+                            cur.set(Self::Link { next: Rc::clone(&next_next) });
                             cur = next;
                             next = next_next;
                         },
@@ -122,13 +111,53 @@ impl Membership
             },
         }
     }
+
+    /// Like [`get_rep_and_weight`](Self::get_rep_and_weight) but only returns the representative.
+    fn get_rep(it: &Rc<Cell<Self>>) -> Rc<Cell<Self>>
+    {
+        Self::get_rep_and_weight(it).0
+    }
+
+    /// Use [`ptr::eq`] to compare references to [`Representative`](Self::Representative) objects,
+    /// so that distinct objects represent distinct equivalence classes.
+    fn eq_rep(
+        it: &Rc<Cell<Self>>,
+        other: &Rc<Cell<Self>>,
+    ) -> bool
+    {
+        debug_assert!(matches!(
+            (Self::clone_inner(it), Self::clone_inner(other)),
+            (Self::Representative { .. }, Self::Representative { .. })
+        ));
+
+        ptr::eq(&**it, &**other)
+    }
+
+    /// Set `it` to be a [`Representative`](Self::Representative) with the given `weight`.
+    fn set_rep(
+        it: &Rc<Cell<Self>>,
+        weight: usize,
+    )
+    {
+        it.set(Self::Representative { weight });
+    }
+
+    /// Set `it` to be a [`Link`](Self::Link) to the given `next`.
+    fn set_link(
+        it: &Rc<Cell<Self>>,
+        next: Rc<Cell<Self>>,
+    )
+    {
+        it.set(Self::Link { next });
+    }
 }
+
 
 /// The classes of the nodes that are known to be equivalent, for an invocation of the algorithm.
 pub(super) struct EquivClasses<K>
 {
     /// Table that associates nodes by ID with their equivalence class.
-    map: HashMap<K, Rc<Cell<Membership>>>,
+    map: HashMap<K, Rc<Cell<Class>>>,
 }
 
 impl<K: Eq + Hash + Clone> EquivClasses<K>
@@ -148,10 +177,10 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
         bk: &K,
     )
     {
-        let am = Membership::default();
-        let bm = Rc::clone(&am);
-        let _ignored1 = self.map.insert(ak.clone(), am);
-        let _ignored2 = self.map.insert(bk.clone(), bm);
+        let ac = Class::new();
+        let bc = Rc::clone(&ac);
+        let _ignored1 = self.map.insert(ak.clone(), ac);
+        let _ignored2 = self.map.insert(bk.clone(), bc);
     }
 
     /// First time one node is seen but the other has already been seen.
@@ -163,13 +192,12 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
     /// transitively equivalent to the unseen, which can improve efficiency for some shapes.
     fn some_seen(
         &mut self,
-        om: &Rc<Cell<Membership>>,
+        oc: &Rc<Cell<Class>>,
         k: &K,
     )
     {
-        let c = Membership::class(om);
-        let m = Membership::new(c);
-        let _ignored = self.map.insert(k.clone(), m);
+        let r = Class::get_rep(oc);
+        let _ignored = self.map.insert(k.clone(), r);
     }
 
     /// Both nodes have already been seen, but maybe not already known to be equivalent.
@@ -181,34 +209,32 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
     /// causes any further nodes that were already members of the classes to now be transitively
     /// equivalent to each other, which can improve efficiency for some shapes.
     fn all_seen(
-        am: &Rc<Cell<Membership>>,
-        bm: &Rc<Cell<Membership>>,
+        ac: &Rc<Cell<Class>>,
+        bc: &Rc<Cell<Class>>,
     ) -> bool
     {
-        let ac = Membership::class(am);
-        let bc = Membership::class(bm);
+        let (ar, aw) = Class::get_rep_and_weight(ac);
+        let (br, bw) = Class::get_rep_and_weight(bc);
 
         // Already same class.
-        if ac == bc {
+        if Class::eq_rep(&ar, &br) {
             true
         }
         // Merge classes, according to the "weighted union rule" as prescribed by the paper.
         else {
-            let (aw, bw) = (ac.get().weight, bc.get().weight);
-            let (larger_memb, larger_class, smaller_memb);
+            let (larger_rep, smaller_rep);
 
             if aw >= bw {
-                larger_memb = am;
-                larger_class = ac;
-                smaller_memb = bm;
+                larger_rep = ar;
+                smaller_rep = br;
             }
             else {
-                larger_memb = bm;
-                larger_class = bc;
-                smaller_memb = am;
+                larger_rep = br;
+                smaller_rep = ar;
             }
-            smaller_memb.set(Membership::Chain(Rc::clone(larger_memb)));
-            larger_class.set(Class { weight: aw.saturating_add(bw) });
+            Class::set_rep(&larger_rep, aw.saturating_add(bw));
+            Class::set_link(&smaller_rep, larger_rep);
+
             false
         }
     }
@@ -235,17 +261,17 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
                 self.none_seen(ak, bk);
                 false
             },
-            (Some(am), None) => {
-                let am = &Rc::clone(am); // To end borrow of `self`.
-                self.some_seen(am, bk);
+            (Some(ac), None) => {
+                let ac = &Rc::clone(ac); // To end borrow of `self`.
+                self.some_seen(ac, bk);
                 false
             },
-            (None, Some(bm)) => {
-                let bm = &Rc::clone(bm); // To end borrow of `self`.
-                self.some_seen(bm, ak);
+            (None, Some(bc)) => {
+                let bc = &Rc::clone(bc); // To end borrow of `self`.
+                self.some_seen(bc, ak);
                 false
             },
-            (Some(am), Some(bm)) => Self::all_seen(am, bm),
+            (Some(ac), Some(bc)) => Self::all_seen(ac, bc),
         }
     }
 }
@@ -257,58 +283,64 @@ mod tests
     use super::*;
 
     #[test]
-    fn class_eq()
+    fn eq_rep()
     {
+        fn rep(weight: usize) -> Rc<Cell<Class>>
         {
-            #![allow(clippy::eq_op)]
-            let r = &Class { weight: 0 };
-            assert!(r == r);
-        };
+            Rc::new(Cell::new(Class::Representative { weight }))
+        }
+
         {
-            let r1 = &Class { weight: 1 };
-            let r2 = r1;
-            assert_eq!(r1, r2);
-        };
+            let r = &rep(0);
+            assert!(Class::eq_rep(r, r));
+        }
         {
-            let r1 = Rc::new(Class { weight: 2 });
+            let r1 = rep(2);
             let r2 = Rc::clone(&r1);
-            assert_eq!(r1, r2);
-        };
+            assert!(Class::eq_rep(&r1, &r2));
+        }
         {
-            let r1 = Rc::new(Class { weight: 3 });
-            let r2 = Rc::new(Class { weight: 3 });
-            assert_ne!(r1, r2);
-        };
+            let r1 = rep(3);
+            let r2 = rep(3);
+            assert!(!Class::eq_rep(&r1, &r2));
+        }
     }
 
     #[test]
-    fn class_of()
+    fn get_rep()
     {
-        let class1 = Class::default();
-        let memb1 = Membership::new(Rc::clone(&class1));
-        let memb2 = Membership::new(Rc::clone(&class1));
-        let memb3 = Rc::new(Cell::new(Membership::Chain(Rc::clone(&memb1))));
-        let memb4 = Rc::new(Cell::new(Membership::Chain(Rc::clone(&memb2))));
-        let memb5 = Rc::new(Cell::new(Membership::Chain(Rc::clone(&memb4))));
-        let memb6 = Rc::new(Cell::new(Membership::Chain(Rc::clone(&memb5))));
+        fn link(next: &Rc<Cell<Class>>) -> Rc<Cell<Class>>
+        {
+            let new = Class::new();
+            Class::set_link(&new, Rc::clone(next));
+            new
+        }
 
-        assert_eq!(Membership::class(&memb1), class1);
-        assert_eq!(Membership::class(&memb2), class1);
-        assert_eq!(Membership::class(&memb3), class1);
-        assert_eq!(Membership::class(&memb4), class1);
-        assert_eq!(Membership::class(&memb5), class1);
-        assert_eq!(Membership::class(&memb6), class1);
+        let rep1 = Class::new();
+        let link1 = link(&rep1);
+        let link2 = link(&rep1);
+        let link3 = link(&link1);
+        let link4 = link(&link2);
+        let link5 = link(&link4);
+        let link6 = link(&link5);
 
-        let class2 = Class::default();
-        let memb7 = Membership::new(Rc::clone(&class2));
-        assert_ne!(Membership::class(&memb7), class1);
+        assert!(Class::eq_rep(&Class::get_rep(&link1), &rep1));
+        assert!(Class::eq_rep(&Class::get_rep(&link2), &rep1));
+        assert!(Class::eq_rep(&Class::get_rep(&link3), &rep1));
+        assert!(Class::eq_rep(&Class::get_rep(&link4), &rep1));
+        assert!(Class::eq_rep(&Class::get_rep(&link5), &rep1));
+        assert!(Class::eq_rep(&Class::get_rep(&link6), &rep1));
+
+        let rep2 = Class::new();
+        let link7 = link(&rep2);
+        assert!(!Class::eq_rep(&Class::get_rep(&link7), &rep1));
     }
 
     #[test]
     fn same_class()
     {
         let mut ec = EquivClasses::new();
-        let keys = ['a', 'b', 'c', 'd', 'e', 'f'];
+        let keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
         assert!(!ec.same_class(&keys[0], &keys[1]));
         assert!(ec.same_class(&keys[0], &keys[1]));
@@ -324,7 +356,15 @@ mod tests
 
         assert!(!ec.same_class(&keys[4], &keys[5]));
         assert!(ec.same_class(&keys[4], &keys[5]));
+
+        assert!(!ec.same_class(&keys[5], &keys[6]));
+        assert!(ec.same_class(&keys[5], &keys[6]));
+        assert!(ec.same_class(&keys[4], &keys[6]));
+
         assert!(!ec.same_class(&keys[1], &keys[4]));
+        assert!(ec.same_class(&keys[1], &keys[4]));
+        assert!(ec.same_class(&keys[1], &keys[5]));
+        assert!(ec.same_class(&keys[1], &keys[6]));
 
         for a in &keys {
             for b in &keys {
