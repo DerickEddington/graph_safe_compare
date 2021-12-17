@@ -7,6 +7,14 @@ repository = "https://github.com/DerickEddington/cycle_deep_safe_compare"
 edition = "2021"
 
 [workspace]
+# The `test_no_std` package is independent, not a member of the workspace, so
+# that it can use different settings, since it's a peculiar kind of integration test.
+exclude = ["test_no_std"]
+
+[features]
+default = ["std"]
+std = ["alloc"]
+alloc = []
 
 [dependencies]
 fastrand = "1"

@@ -1,2 +1,4 @@
 /target
 Cargo.lock
+/test_no_std/target
+/test_no_std/Cargo.lock

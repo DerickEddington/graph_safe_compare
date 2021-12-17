@@ -1,0 +1,34 @@
+[package]
+name = "test_no_std"
+version = "0.0.0"
+edition = "2021"
+description = "Integration tests of using the package in the parent directory as `no_std`."
+
+# These `panic="abort"` eliminate the requirement to provide the unstable
+# nightly-only `eh_personality` "lang item" (but not for tests, benchmarks,
+# build scripts, and proc macros).
+[profile.dev]
+panic = "abort"
+[profile.release]
+panic = "abort"
+# lto = true  # Must disable `build.rustflags="-C prefer-dynamic"` in `.cargo/config.toml`.
+# codegen-units = 1
+
+[features]
+# Be able to test with the `std`-using items of the dependency.  Disabled by default.
+std = ["cycle_deep_safe_compare/std"]
+# Expected to cause build to fail due to missing items without "std".  Disabled by default.
+prove_dep_is_no_std = []
+
+[lib]
+crate-type = ["lib", "dylib"]
+doctest = false  # Prevent trying to build as a lib without `panic="abort"`.
+
+[[bin]]
+name = "test_no_std"
+test = false  # Prevent trying to build as a test harness without `panic="abort"`.
+bench = false # Ditto.
+
+[dependencies]
+cycle_deep_safe_compare = { path = "..", default-features = false }
+libc = { version = "0.2", default-features = false }

@@ -3,6 +3,7 @@
 //! Checking for Trees and Graphs](https://michaeldadams.org/papers/efficient_equality/).  TODO:
 //! Has further enhancements, like ordering comparison ...
 
+// Apply the `no_std` attribute unconditionally, to require explicit `use` of non-`core` items.
 #![no_std]
 #![forbid(unsafe_code)]
 // Warn about desired lints that would otherwise be allowed by default.
