@@ -157,11 +157,11 @@ macro_rules! eq_variation_mod_body {
         };
 
         #[derive(Debug)]
-        struct MyEq<'l>($my_type, PhantomData<&'l ()>);
+        pub struct MyEq<'l>($my_type, PhantomData<&'l ()>);
 
         impl<'l> MyEq<'l>
         {
-            fn new(d: $datum_type) -> Self
+            pub fn new(d: $datum_type) -> Self
             {
                 Self(My(d), PhantomData)
             }
@@ -350,10 +350,15 @@ macro_rules! eq_variations_tests
                 use cycle_deep_safe_compare::{
                     basic::recursion::callstack::CallStack,
                     deep_safe::recursion::vecstack::VecStack,
-                    generic,
+                    generic::{
+                        self,
+                        equiv_classes::premade::HashMap,
+                    },
                 };
 
-                generic::precheck_interleave_equiv::<_, CallStack, VecStack<_>>(a, b)
+                generic::precheck_interleave_equiv::<
+                        _, HashMap<_>, CallStack, VecStack<_>>(
+                    a, b)
             }
 
             mod precheck_interleave_callstack_vecstack
@@ -365,9 +370,6 @@ macro_rules! eq_variations_tests
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
                                          #[cfg(all())], #[cfg(all())]);
             }
-
-            // TODO: In the future, when the known-equivalent table is made generic, seems like
-            // should add tests of using that for customization here.
         }
 
     };

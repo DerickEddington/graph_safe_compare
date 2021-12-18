@@ -1,51 +1,67 @@
-use {
-    self::{
-        equiv::{
-            Descend,
-            Equiv,
-            Recur,
-        },
-        recursion::Reset,
-    },
-    crate::{
-        basic::modes::limited::Limited,
-        cycle_safe::modes::interleave::{
-            Interleave,
-            PRE_LIMIT,
-        },
-        Node,
-    },
-    core::ops::ControlFlow,
-};
+pub use premade::*;
+
+pub mod equiv_classes;
 
 
-// TODO: Make generic on the "already seen" map type, once that is generic.
-/// Equivalence predicate that can handle cyclic graphs, but first tries the precheck that is
-/// faster for small acyclic graphs, and that requires choosing specific type arguments for the
-/// recursion stack used for both the precheck and the interleave.  Safe for very-deep graphs only
-/// when the recursion-stack type is.
-#[inline]
-pub fn precheck_interleave_equiv<N: Node, SP: Default + Reset + Into<SI>, SI>(
-    a: &N,
-    b: &N,
-) -> bool
-where
-    Equiv<Limited<N>, SP>: Descend<Node = N> + Recur<Node = N>,
-    Equiv<Interleave<N>, SI>: Descend<Node = N> + Recur<Node = N>,
+mod premade
 {
-    let mut e = Equiv::<Limited<N>, SP>::new(PRE_LIMIT.into(), SP::default());
-
-    match e.precheck_equiv(a, b) {
-        ControlFlow::Break(result) => result,
-        ControlFlow::Continue(()) => {
-            let mut e: Equiv<Interleave<N>, SI> = e.into();
-            e.is_equiv(a, b)
+    use {
+        super::{
+            equiv::{
+                Descend,
+                Equiv,
+                Recur,
+            },
+            equiv_classes::Table,
+            recursion::Reset,
         },
+        crate::{
+            basic::modes::limited::Limited,
+            cycle_safe::modes::interleave::{
+                Interleave,
+                PRE_LIMIT,
+            },
+            Node,
+        },
+        core::ops::ControlFlow,
+    };
+
+
+    /// Equivalence predicate that can handle cyclic graphs, but first tries the precheck that is
+    /// faster for small acyclic graphs, and that requires choosing specific type arguments that
+    /// determine the implementations of internal dynamic data structures.
+    ///
+    /// Type arguments must be chosen for the table (`T`) used for the internal equivalence
+    /// classes and chosen for the recursion stack(s) used for the precheck (`SP`) and the
+    /// interleave (`SI`).  Safe for very-deep graphs only when the interleave recursion-stack
+    /// type is.
+    #[inline]
+    pub fn precheck_interleave_equiv<N, T, SP, SI>(
+        a: &N,
+        b: &N,
+    ) -> bool
+    where
+        N: Node,
+        T: Table<Node = N>,
+        SP: Default + Reset + Into<SI>,
+        Equiv<Limited<N>, SP>: Descend<Node = N> + Recur<SP, Node = N>,
+        Equiv<Interleave<T>, SI>: Descend<Node = N> + Recur<SI, Node = N>,
+    {
+        let mut e = Equiv::<Limited<N>, SP>::new(PRE_LIMIT.into(), SP::default());
+
+        match e.precheck_equiv(a, b) {
+            ControlFlow::Break(result) => result,
+            ControlFlow::Continue(()) => {
+                let mut e: Equiv<Interleave<T>, SI> = e.into();
+                e.is_equiv(a, b)
+            },
+        }
     }
 }
 
 
-pub(super) mod recursion
+/// Items related to the generic recursion that the algorithm does for graph traversals.
+pub mod recursion
 {
     /// An aborted precheck, that uses particular types of recursion-stacks, might leave some
     /// elements on such a stack, in which case it needs to be reset before doing the interleave
@@ -61,7 +77,8 @@ pub(super) mod recursion
 }
 
 
-pub(super) mod equiv
+/// The central parts of the algorithm.
+pub mod equiv
 {
     use {
         crate::Node,
@@ -73,6 +90,7 @@ pub(super) mod equiv
     /// The `mode` type `M` must, and the `recur_stack` type `S` may, themselves be generic over a
     /// type parameter, conventionally named `N`, for the generic [`Node`] types, so that various
     /// `impl`s on `Equiv` can have the `N` parameter be constrained.
+    #[non_exhaustive]
     pub struct Equiv<M, S>
     {
         /// Decremented for every node edge descended into.  May be arbitrarily initialized,
@@ -89,6 +107,7 @@ pub(super) mod equiv
     /// This occurs when the [`Descend::do_recur`] returns `false`.
     ///
     /// Used as the value in a `Result::Err`.
+    #[non_exhaustive]
     pub struct Aborted;
 
     /// Controls if node edges are descended into.
@@ -131,7 +150,10 @@ pub(super) mod equiv
     ///
     /// Implemented on [`Equiv`] of various types, instead of on the stack types, so that these
     /// methods have access to the entire `Equiv` values.
-    pub trait Recur
+    ///
+    /// The generic type parameter `S` exists only to enable implementing this trait for `Equiv`
+    /// of custom types outside of this crate.
+    pub trait Recur<S>
     {
         /// Constrains `impl<N>` for a particular [`Equiv`] variation.
         type Node: Node;
@@ -144,6 +166,9 @@ pub(super) mod equiv
         ///
         /// Returning values other than `Ok(true)` causes the invocation of the algorithm to
         /// immediately return the `Ok(false)` or `Err(Aborted)` value.
+        ///
+        /// # Errors
+        /// If aborted early, when recurred on immediately, returns `Err(Aborted)`.
         fn recur(
             &mut self,
             a: Self::Node,
@@ -161,7 +186,7 @@ pub(super) mod equiv
     /// This generic design works with the [`Node`], [`Descend`], and [`Recur`] traits to enable
     /// variations.
     impl<N: Node, M, S> Equiv<M, S>
-    where Self: Descend<Node = N> + Recur<Node = N>
+    where Self: Descend<Node = N> + Recur<S, Node = N>
     {
         /// Convenience that calls [`Self::equiv`] and returns `true` if the given nodes are
         /// equivalent, `false` if not or if the algorithm aborted early (which can be impossible
@@ -183,6 +208,7 @@ pub(super) mod equiv
         ///
         /// Returns `Ok(false)` if the given nodes are unequivalent.
         ///
+        /// # Errors
         /// Returns `Err(Aborted)` if the [`Descend::do_recur`] indicates to abort early.
         #[inline]
         pub fn equiv<T: Borrow<N>>(
@@ -221,6 +247,12 @@ pub(super) mod equiv
         ///
         /// Must not be used as the initial entry-point, but may be called by [`Recur::recur`]
         /// implementations.
+        ///
+        /// Returns same as [`Self::equiv`].
+        ///
+        /// # Errors
+        /// Same as [`Self::equiv`].
+        #[inline]
         pub fn equiv_main(
             &mut self,
             a: &N,
@@ -259,7 +291,3 @@ pub(super) mod equiv
         }
     }
 }
-
-
-// TODO: In the future, when these aspects are made generic
-// pub mod equiv_classes;

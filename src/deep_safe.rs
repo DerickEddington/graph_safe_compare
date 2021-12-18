@@ -23,7 +23,6 @@ pub fn equiv<N: Node>(
 /// Extend the algorithm to be able to traverse very-deep graphs.
 pub mod recursion
 {
-    // TODO: Make conditional on a new `alloc` feature
     pub mod vecstack
     {
         //! Use [`Vec`] for the recursion stack, instead of the call-stack.
@@ -79,6 +78,7 @@ pub mod recursion
         /// reset before doing the interleave using the same `VecStack`.
         impl<N> Reset for VecStack<N>
         {
+            #[inline]
             fn reset(mut self) -> Self
             {
                 self.0.clear();
@@ -87,10 +87,11 @@ pub mod recursion
         }
 
         /// Enables [`VecStack`] to be used with the algorithm.
-        impl<N: Node, M> Recur for Equiv<M, VecStack<N>>
+        impl<N: Node, M> Recur<VecStack<N>> for Equiv<M, VecStack<N>>
         {
             type Node = N;
 
+            #[inline]
             fn recur(
                 &mut self,
                 a: Self::Node,
@@ -101,6 +102,7 @@ pub mod recursion
                 Ok(true)
             }
 
+            #[inline]
             fn next(&mut self) -> Option<(Self::Node, Self::Node)>
             {
                 self.recur_stack.0.pop()

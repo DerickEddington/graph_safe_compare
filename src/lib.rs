@@ -2,7 +2,19 @@
 //! graphs.  Extends the algorithm described in the paper [Efficient Nondestructive Equality
 //! Checking for Trees and Graphs](https://michaeldadams.org/papers/efficient_equality/).  TODO:
 //! Has further enhancements, like ordering comparison ...
-
+#![cfg_attr(
+    not(feature = "std"),
+    doc = "\n",
+    doc = "Note: This crate was built without its `std` feature and some premade items are \
+           unavailable, and so custom types must be provided and used with the items of the \
+           [`generic`] module, to have cycle-safety and/or deep-safety."
+)]
+#![cfg_attr(
+    all(not(feature = "std"), feature = "alloc"),
+    doc = "\n",
+    doc = "Note: This crate was built with its `alloc` feature, and so some premade items, \
+           that use the [`alloc`](https://doc.rust-lang.org/alloc/) crate, are available."
+)]
 // Apply the `no_std` attribute unconditionally, to require explicit `use` of non-`core` items.
 #![no_std]
 #![forbid(unsafe_code)]
@@ -23,7 +35,7 @@
     meta_variable_misuse,
     // missing_copy_implementations,
     // missing_debug_implementations,
-    // missing_docs,
+    missing_docs,
     // // missing_doc_code_examples, // maybe someday
     noop_method_call,
     pointer_structural_match,
@@ -56,6 +68,7 @@ use core::{
 };
 
 
+#[cfg(feature = "std")]
 /// Items that are safe for cyclic, degenerate, and very-deep graphs.
 pub mod robust;
 
@@ -63,6 +76,7 @@ pub mod robust;
 /// graphs.
 pub mod cycle_safe;
 
+#[cfg(feature = "alloc")]
 /// Items that are safe for very-deep graphs, but not, by themselves, for cyclic nor degenerate
 /// graphs.
 pub mod deep_safe;
@@ -71,10 +85,9 @@ pub mod deep_safe;
 pub mod basic;
 
 /// Items that require choosing specific instantiations, which allows customizability beyond the
-/// premade functions of the other modules.
+/// premade functions of the other modules.  Can be used to achieve cycle-safety and/or
+/// deep-safety.
 pub mod generic;
-
-mod equiv_classes;
 
 
 /// What the algorithm requires from a type, to be applied to it.

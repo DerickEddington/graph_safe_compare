@@ -26,3 +26,25 @@ tests_utils = { path = "tests_utils" }
 name = "derived_eq"
 crate-type = ["lib"]
 test = true
+
+[[test]]
+name = "borrow_pair"
+required-features = ["std"]
+
+# Note: The "custom" test does not require any features.
+
+[[test]]
+name = "diff_edge"
+required-features = ["std"]
+
+[[test]]
+name = "diff_index"
+required-features = ["std"]
+
+[[test]]
+name = "dyn_pair"
+required-features = ["std"]
+
+[[test]]
+name = "rc_pair"
+required-features = ["std"]

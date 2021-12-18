@@ -3,6 +3,7 @@ use crate::{
     deep_safe::recursion::vecstack::VecStack,
     generic::{
         equiv::Equiv,
+        equiv_classes::premade::HashMap,
         precheck_interleave_equiv,
     },
     Node,
@@ -16,7 +17,7 @@ pub fn equiv<N: Node>(
     b: &N,
 ) -> bool
 {
-    let mut e = Equiv::<Interleave<N>, _>::new(VecStack::default());
+    let mut e = Equiv::<Interleave<HashMap<N>>, _>::new(VecStack::default());
     e.is_equiv(a, b)
 }
 
@@ -28,5 +29,5 @@ pub fn precheck_equiv<N: Node>(
     b: &N,
 ) -> bool
 {
-    precheck_interleave_equiv::<N, VecStack<N>, VecStack<N>>(a, b)
+    precheck_interleave_equiv::<N, HashMap<N>, VecStack<N>, VecStack<N>>(a, b)
 }

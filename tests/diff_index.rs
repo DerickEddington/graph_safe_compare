@@ -1,8 +1,11 @@
 use {
     cycle_deep_safe_compare::{
         basic::recursion::callstack::CallStack,
-        deep_safe::recursion::vecstack::VecStack,
-        generic::precheck_interleave_equiv,
+        generic::{
+            equiv_classes::premade::HashMap,
+            precheck_interleave_equiv,
+        },
+        robust,
         Node,
     },
     std::{
@@ -32,9 +35,10 @@ impl PartialEq for My
         other: &Self,
     ) -> bool
     {
-        let callstack = precheck_interleave_equiv::<_, CallStack, CallStack>(self, other);
-        let vecstack = precheck_interleave_equiv::<_, VecStack<_>, VecStack<_>>(self, other);
-        assert_eq!(callstack, vecstack);
+        let callstack =
+            precheck_interleave_equiv::<_, HashMap<_>, CallStack, CallStack>(self, other);
+        let robust = robust::precheck_equiv(self, other);
+        assert_eq!(callstack, robust);
         callstack
     }
 }

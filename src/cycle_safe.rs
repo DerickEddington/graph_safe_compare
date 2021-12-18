@@ -1,52 +1,64 @@
-use {
-    self::modes::interleave::Interleave,
-    crate::{
-        basic::recursion::callstack::CallStack,
-        generic::{
-            equiv::Equiv,
-            precheck_interleave_equiv,
+#[cfg(feature = "std")]
+pub use premade::*;
+
+#[cfg(feature = "std")]
+mod premade
+{
+    use {
+        super::modes::interleave::Interleave,
+        crate::{
+            basic::recursion::callstack::CallStack,
+            generic::{
+                equiv::Equiv,
+                equiv_classes::premade::HashMap,
+                precheck_interleave_equiv,
+            },
+            Node,
         },
-        Node,
-    },
-};
+    };
 
 
-/// Equivalence predicate that can handle cyclic graphs but not very-deep graphs.
-#[inline]
-pub fn equiv<N: Node>(
-    a: &N,
-    b: &N,
-) -> bool
-{
-    let mut e = Equiv::<Interleave<N>, _>::new(CallStack);
-    e.is_equiv(a, b)
+    /// Equivalence predicate that can handle cyclic graphs but not very-deep graphs.
+    #[inline]
+    pub fn equiv<N: Node>(
+        a: &N,
+        b: &N,
+    ) -> bool
+    {
+        let mut e = Equiv::<Interleave<HashMap<N>>, _>::new(CallStack);
+        e.is_equiv(a, b)
+    }
+
+
+    /// Like [`equiv`] but first tries the precheck that is faster for small acyclic graphs.
+    #[inline]
+    pub fn precheck_equiv<N: Node>(
+        a: &N,
+        b: &N,
+    ) -> bool
+    {
+        precheck_interleave_equiv::<N, HashMap<N>, CallStack, CallStack>(a, b)
+    }
 }
 
 
-/// Like [`equiv`] but first tries the precheck that is faster for small acyclic graphs.
-#[inline]
-pub fn precheck_equiv<N: Node>(
-    a: &N,
-    b: &N,
-) -> bool
-{
-    precheck_interleave_equiv::<N, CallStack, CallStack>(a, b)
-}
-
-
-pub(super) mod modes
+/// Modes of the algorithm that enable handling cyclic and degenerate graphs.
+pub mod modes
 {
     /// Make the algorithm interleave a shared-structure-detecting "slow" phase with a basic
     /// "fast" phase.
-    pub(crate) mod interleave
+    pub mod interleave
     {
         use crate::{
             basic::modes::limited::Limited,
-            equiv_classes::EquivClasses,
             generic::{
                 equiv::{
                     Descend,
                     Equiv,
+                },
+                equiv_classes::{
+                    EquivClasses,
+                    Table,
                 },
                 recursion::Reset,
             },
@@ -63,15 +75,21 @@ pub(super) mod modes
         pub(crate) const SLOW_LIMIT_NEG: i32 = -(SLOW_LIMIT as i32);
 
         /// Specifies use of the "interleave" mode.
-        pub struct Interleave<N: Node>
+        ///
+        /// The chosen `T` type must implement [`Table`].
+        pub struct Interleave<T>
         {
             /// Table of nodes that have already been seen and recorded as equivalent, for use by
             /// the "slow" phase.
-            equiv_classes: EquivClasses<N::Id>,
+            equiv_classes: EquivClasses<T>,
         }
 
-        impl<N: Node, S> Equiv<Interleave<N>, S>
+        impl<T: Default, S> Equiv<Interleave<T>, S>
         {
+            /// Create a new state for an invocation of the [`Interleave`] mode of the algorithm.
+            ///
+            /// The given `recur_stack` type determines how the algorithm will do its recursions,
+            /// and the value must be new or [`Reset`].
             #[inline]
             pub fn new(recur_stack: S) -> Self
             {
@@ -86,11 +104,10 @@ pub(super) mod modes
         /// Enables the same recursion-stack value to be reused across the precheck and the
         /// interleave, which is more efficient for some types since this avoids dropping it and
         /// creating another.
-        impl<N, SP, SI> From<Equiv<Limited<N>, SP>> for Equiv<Interleave<N>, SI>
-        where
-            N: Node,
-            SP: Reset + Into<SI>,
+        impl<SP, SI, N, T: Default> From<Equiv<Limited<N>, SP>> for Equiv<Interleave<T>, SI>
+        where SP: Reset + Into<SI>
         {
+            #[inline]
             fn from(prechecker: Equiv<Limited<N>, SP>) -> Self
             {
                 Self::new(prechecker.recur_stack.reset().into())
@@ -98,13 +115,14 @@ pub(super) mod modes
         }
 
         /// Enables [`Interleave`] to be used with the algorithm.
-        impl<N: Node, S> Descend for Equiv<Interleave<N>, S>
+        impl<T: Table, S> Descend for Equiv<Interleave<T>, S>
         {
-            type Node = N;
+            type Node = T::Node;
 
             /// Determine whether to use "slow" or "fast" phase, based on our limits.  When "slow"
             /// phase, if the nodes are already known to be equivalent then do not check their
             /// descendents.
+            #[inline]
             fn do_edges(
                 &mut self,
                 a: &Self::Node,
@@ -148,6 +166,7 @@ pub(super) mod modes
             }
 
             /// When [`Self::do_edges`] returns `true`, descend into edges without limit.
+            #[inline]
             fn do_recur(&mut self) -> bool
             {
                 true

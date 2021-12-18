@@ -53,6 +53,7 @@ pub fn limited_equiv<N: Node>(
 }
 
 
+/// Basic support, that cannot handle very-deep graphs, for recursion of the algorithm.
 pub mod recursion
 {
     /// Use the normal call-stack for the recursions done to descend node edges.
@@ -73,13 +74,14 @@ pub mod recursion
 
         /// Specifies use of the normal call-stack.
         #[derive(Default)]
-        #[allow(clippy::exhaustive_structs)]
+        #[non_exhaustive]
         pub struct CallStack;
 
         /// Only for compatibility with generic uses of recursion-stack types.  The call-stack
         /// does not need to be reset, so this is a no-op for this type.
         impl Reset for CallStack
         {
+            #[inline]
             fn reset(self) -> Self
             {
                 self
@@ -87,11 +89,12 @@ pub mod recursion
         }
 
         /// Enables [`CallStack`] to be used with the algorithm.
-        impl<N: Node, M> Recur for Equiv<M, CallStack>
+        impl<N: Node, M> Recur<CallStack> for Equiv<M, CallStack>
         where Self: Descend<Node = N>
         {
             type Node = N;
 
+            #[inline]
             fn recur(
                 &mut self,
                 a: Self::Node,
@@ -101,6 +104,7 @@ pub mod recursion
                 self.equiv_main(&a, &b)
             }
 
+            #[inline]
             fn next(&mut self) -> Option<(Self::Node, Self::Node)>
             {
                 None
@@ -109,10 +113,11 @@ pub mod recursion
     }
 }
 
-pub(super) mod modes
+/// Modes of the algorithm that are useful in basic ways.
+pub mod modes
 {
     /// Do not limit the algorithm in how many node edges are descended, and never abort early.
-    pub(crate) mod unlimited
+    pub mod unlimited
     {
         use {
             crate::{
@@ -134,6 +139,10 @@ pub(super) mod modes
 
         impl<N, S> Equiv<Unlimited<N>, S>
         {
+            /// Create a new state for an invocation of the [`Unlimited`] mode of the algorithm.
+            ///
+            /// The given `recur_stack` type determines how the algorithm will do its recursions,
+            /// and the value must be new or [`Reset`](crate::generic::recursion::Reset).
             #[inline]
             pub fn new(recur_stack: S) -> Self
             {
@@ -143,6 +152,7 @@ pub(super) mod modes
 
         impl<N, S: Default> Default for Equiv<Unlimited<N>, S>
         {
+            #[inline]
             fn default() -> Self
             {
                 Self::new(S::default())
@@ -155,6 +165,7 @@ pub(super) mod modes
             type Node = N;
 
             /// Always start handling node edges.
+            #[inline]
             fn do_edges(
                 &mut self,
                 _a: &Self::Node,
@@ -165,6 +176,7 @@ pub(super) mod modes
             }
 
             /// Always descend into edges, without limit.
+            #[inline]
             fn do_recur(&mut self) -> bool
             {
                 true
@@ -173,7 +185,7 @@ pub(super) mod modes
     }
 
     /// Limit the algorithm in how many node edges it is allowed to descend before aborting early.
-    pub(crate) mod limited
+    pub mod limited
     {
         use {
             crate::{
@@ -199,6 +211,10 @@ pub(super) mod modes
 
         impl<N, S> Equiv<Limited<N>, S>
         {
+            /// Create a new state for an invocation of the [`Limited`] mode of the algorithm.
+            ///
+            /// The given `recur_stack` type determines how the algorithm will do its recursions,
+            /// and the value must be new or [`Reset`](crate::generic::recursion::Reset).
             #[inline]
             pub fn new(
                 limit: i32,
@@ -210,7 +226,7 @@ pub(super) mod modes
         }
 
         impl<N: Node, S> Equiv<Limited<N>, S>
-        where Self: Descend<Node = N> + Recur<Node = N>
+        where Self: Descend<Node = N> + Recur<S, Node = N>
         {
             /// Intended for uses where early abort due to reaching the limit should cause control
             /// to continue on to some other attempt.
@@ -231,6 +247,7 @@ pub(super) mod modes
             type Node = N;
 
             /// Always start handling node edges.
+            #[inline]
             fn do_edges(
                 &mut self,
                 _a: &Self::Node,
@@ -241,6 +258,7 @@ pub(super) mod modes
             }
 
             /// Enforce the limit on the amount of edges descended into.
+            #[inline]
             fn do_recur(&mut self) -> bool
             {
                 self.ticker >= 0

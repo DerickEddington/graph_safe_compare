@@ -13,30 +13,34 @@
 //! ownership and multiple borrows.  [`Cell`] is used because failures are impossible with it
 //! (unlike [`RefCell`](core::cell::RefCell)).
 
-// TODO: Make these conditional on new feature(s), and/or move when the table is made generic.
-extern crate alloc;
-extern crate std;
-
 use {
-    alloc::rc::Rc,
+    crate::Node,
     core::{
         cell::Cell,
-        hash::Hash,
+        ops::Deref,
         ptr,
     },
-    std::collections::HashMap,
 };
 
+
+/// Allows being generic over the type that provides the needed shared ownership of [`Class`].
+pub trait Rc: Deref<Target = Cell<Class<Self>>> + Clone
+{
+    /// Create a new shared-ownership allocation for `value`.
+    fn new(value: Cell<Class<Self>>) -> Self;
+}
 
 /// Membership in an equivalence class.
 ///
 /// Optimized for merging with other classes and for checking membership in the same class.
 #[derive(Clone)]
-enum Class
+#[non_exhaustive]
+pub enum Class<R>
 {
     /// An equivalence class.
     ///
     /// Distinct objects of this variant represent distinct equivalence classes.
+    #[non_exhaustive]
     Representative
     {
         /// Determines which `Representative` object is merged when nodes are recorded as
@@ -47,33 +51,36 @@ enum Class
     ///
     /// This makes all nodes in our class be equivalent to all nodes in the other class, by
     /// transitivity.
+    #[non_exhaustive]
     Link
     {
         /// The other class that we merged with.
-        next: Rc<Cell<Self>>,
+        next: R,
     },
 }
 
-impl Default for Class
+impl<R> Default for Class<R>
 {
+    #[inline]
     fn default() -> Self
     {
         Self::Representative { weight: 1 }
     }
 }
 
-impl Class
+impl<R: Rc> Class<R>
 {
     /// Create a distinct [`Representative`](Self::Representative) object that represents a
     /// distinct equivalence class, with initial weight.
-    fn new() -> Rc<Cell<Self>>
+    #[allow(clippy::new_ret_no_self)] // It actually does return a type that "contains" `Self`.
+    fn new() -> R
     {
-        Rc::new(Cell::new(Self::default()))
+        R::new(Cell::new(Self::default()))
     }
 
     /// This type uses `Cell`, instead of `RefCell`, so that failures are impossible, which
     /// requires the approach of this function because our type cannot be `Copy`.
-    fn clone_inner(it: &Rc<Cell<Self>>) -> Self
+    fn clone_inner(it: &R) -> Self
     {
         let dummy = Self::default();
         let inner = it.replace(dummy);
@@ -88,21 +95,21 @@ impl Class
     /// Follows [`Link`](Self::Link) chains to the distinct
     /// [`Representative`](Self::Representative) object.  Long chains are shortened, to improve
     /// efficiency for subsequent traversals.
-    fn get_rep_and_weight(it: &Rc<Cell<Self>>) -> (Rc<Cell<Self>>, usize)
+    fn get_rep_and_weight(it: &R) -> (R, usize)
     {
         let it_inner = Self::clone_inner(it);
         match it_inner {
-            Self::Representative { weight } => (Rc::clone(it), weight),
+            Self::Representative { weight } => (R::clone(it), weight),
 
             Self::Link { mut next } => {
-                let mut cur = Rc::clone(it);
+                let mut cur = R::clone(it);
                 loop {
                     let next_inner = Self::clone_inner(&next);
                     match next_inner {
                         Self::Representative { weight } => break (next, weight),
 
                         Self::Link { next: next_next } => {
-                            cur.set(Self::Link { next: Rc::clone(&next_next) });
+                            cur.set(Self::Link { next: R::clone(&next_next) });
                             cur = next;
                             next = next_next;
                         },
@@ -113,7 +120,7 @@ impl Class
     }
 
     /// Like [`get_rep_and_weight`](Self::get_rep_and_weight) but only returns the representative.
-    fn get_rep(it: &Rc<Cell<Self>>) -> Rc<Cell<Self>>
+    fn get_rep(it: &R) -> R
     {
         Self::get_rep_and_weight(it).0
     }
@@ -121,8 +128,8 @@ impl Class
     /// Use [`ptr::eq`] to compare references to [`Representative`](Self::Representative) objects,
     /// so that distinct objects represent distinct equivalence classes.
     fn eq_rep(
-        it: &Rc<Cell<Self>>,
-        other: &Rc<Cell<Self>>,
+        it: &R,
+        other: &R,
     ) -> bool
     {
         debug_assert!(matches!(
@@ -135,7 +142,7 @@ impl Class
 
     /// Set `it` to be a [`Representative`](Self::Representative) with the given `weight`.
     fn set_rep(
-        it: &Rc<Cell<Self>>,
+        it: &R,
         weight: usize,
     )
     {
@@ -144,8 +151,8 @@ impl Class
 
     /// Set `it` to be a [`Link`](Self::Link) to the given `next`.
     fn set_link(
-        it: &Rc<Cell<Self>>,
-        next: Rc<Cell<Self>>,
+        it: &R,
+        next: R,
     )
     {
         it.set(Self::Link { next });
@@ -153,34 +160,61 @@ impl Class
 }
 
 
-/// The classes of the nodes that are known to be equivalent, for an invocation of the algorithm.
-pub(super) struct EquivClasses<K>
+/// Allows being generic over the type that provides the table that associates nodes by ID with
+/// their equivalence classes.
+pub trait Table: Default
 {
-    /// Table that associates nodes by ID with their equivalence class.
-    map: HashMap<K, Rc<Cell<Class>>>,
+    /// The node type that a `Self` table handles.
+    type Node: Node;
+    /// Allows customizing the type that provides the needed shared ownership of equivalence
+    /// classes.
+    type Rc: Rc;
+
+    /// Lookup a node ID and return its equivalence class if associated.
+    fn get(
+        &self,
+        k: &<Self::Node as Node>::Id,
+    ) -> Option<&Self::Rc>;
+
+    /// Associate a node ID with an equivalence class.
+    fn insert(
+        &mut self,
+        k: <Self::Node as Node>::Id,
+        v: Self::Rc,
+    );
 }
 
-impl<K: Eq + Hash + Clone> EquivClasses<K>
+/// The classes of the nodes that are known to be equivalent, for an invocation of the algorithm.
+pub(crate) struct EquivClasses<T>
 {
-    pub(super) fn new() -> Self
-    {
-        Self { map: HashMap::new() }
-    }
+    /// Table that associates nodes by ID with their equivalence class.
+    table: T,
+}
 
+impl<T: Default> EquivClasses<T>
+{
+    pub(crate) fn new() -> Self
+    {
+        Self { table: T::default() }
+    }
+}
+
+impl<T: Table> EquivClasses<T>
+{
     /// First time both nodes are seen.
     ///
     /// Immediately record them as being in the same equivalence class, before checking their
     /// descendents, by associating their IDs with a new equivalence class.
     fn none_seen(
         &mut self,
-        ak: &K,
-        bk: &K,
+        ak: &<T::Node as Node>::Id,
+        bk: &<T::Node as Node>::Id,
     )
     {
         let ac = Class::new();
-        let bc = Rc::clone(&ac);
-        let _ignored1 = self.map.insert(ak.clone(), ac);
-        let _ignored2 = self.map.insert(bk.clone(), bc);
+        let bc = T::Rc::clone(&ac);
+        self.table.insert(ak.clone(), ac);
+        self.table.insert(bk.clone(), bc);
     }
 
     /// First time one node is seen but the other has already been seen.
@@ -192,12 +226,12 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
     /// transitively equivalent to the unseen, which can improve efficiency for some shapes.
     fn some_seen(
         &mut self,
-        oc: &Rc<Cell<Class>>,
-        k: &K,
+        oc: &T::Rc,
+        k: &<T::Node as Node>::Id,
     )
     {
         let r = Class::get_rep(oc);
-        let _ignored = self.map.insert(k.clone(), r);
+        self.table.insert(k.clone(), r);
     }
 
     /// Both nodes have already been seen, but maybe not already known to be equivalent.
@@ -209,8 +243,8 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
     /// causes any further nodes that were already members of the classes to now be transitively
     /// equivalent to each other, which can improve efficiency for some shapes.
     fn all_seen(
-        ac: &Rc<Cell<Class>>,
-        bc: &Rc<Cell<Class>>,
+        ac: &T::Rc,
+        bc: &T::Rc,
     ) -> bool
     {
         let (ar, aw) = Class::get_rep_and_weight(ac);
@@ -250,24 +284,24 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
     /// After returning `false`, their descendents will be checked for equivalence, which might
     /// lead the traversal to these same nodes (cyclic) or to other nodes (DAG) that have been or
     /// will be merged into the same equivalence class.
-    pub(super) fn same_class(
+    pub(crate) fn same_class(
         &mut self,
-        ak: &K,
-        bk: &K,
+        ak: &<T::Node as Node>::Id,
+        bk: &<T::Node as Node>::Id,
     ) -> bool
     {
-        match (self.map.get(ak), self.map.get(bk)) {
+        match (self.table.get(ak), self.table.get(bk)) {
             (None, None) => {
                 self.none_seen(ak, bk);
                 false
             },
             (Some(ac), None) => {
-                let ac = &Rc::clone(ac); // To end borrow of `self`.
+                let ac = &T::Rc::clone(ac); // To end borrow of `self`.
                 self.some_seen(ac, bk);
                 false
             },
             (None, Some(bc)) => {
-                let bc = &Rc::clone(bc); // To end borrow of `self`.
+                let bc = &T::Rc::clone(bc); // To end borrow of `self`.
                 self.some_seen(bc, ak);
                 false
             },
@@ -277,15 +311,127 @@ impl<K: Eq + Hash + Clone> EquivClasses<K>
 }
 
 
+#[cfg(any(feature = "alloc", feature = "std"))]
+/// Items made for ready use as specific choices for the generic types of the equivalence classes
+/// mechanisms.
+pub mod premade
+{
+    #[cfg(feature = "alloc")]
+    pub use alloc::*;
+    #[cfg(feature = "std")]
+    pub use std::*;
+
+    #[cfg(feature = "alloc")]
+    mod alloc
+    {
+        //! Support for [`alloc`] things.
+
+        extern crate alloc;
+
+        use {
+            super::super::Class,
+            core::{
+                cell::Cell,
+                ops::Deref,
+            },
+        };
+
+        /// Enables standard [`Rc`](alloc::rc::Rc) to be used as an
+        /// [`equiv_classes::Rc`](super::super::Rc), which requires this recursive type.
+        #[derive(Clone)]
+        pub struct Rc(alloc::rc::Rc<Cell<Class<Self>>>);
+
+        impl Deref for Rc
+        {
+            type Target = Cell<Class<Self>>;
+
+            #[inline]
+            fn deref(&self) -> &Self::Target
+            {
+                &*self.0
+            }
+        }
+
+        impl super::super::Rc for Rc
+        {
+            #[inline]
+            fn new(val: Cell<Class<Self>>) -> Self
+            {
+                Self(alloc::rc::Rc::new(val))
+            }
+        }
+    }
+
+    #[cfg(feature = "std")]
+    mod std
+    {
+        //! Support for [`std`] things.
+
+        extern crate std;
+
+        use {
+            super::{
+                super::Table,
+                Rc,
+            },
+            crate::Node,
+            std::collections::HashMap as StdHashMap,
+        };
+
+        /// Eases using standard [`HashMap`](StdHashMap) as an [`equiv_classes::Table`](Table)
+        /// that uses [`Rc`].
+        pub struct HashMap<N: Node>(StdHashMap<N::Id, Rc>);
+
+        impl<N: Node> Default for HashMap<N>
+        {
+            #[inline]
+            fn default() -> Self
+            {
+                Self(StdHashMap::default())
+            }
+        }
+
+        impl<N: Node> Table for HashMap<N>
+        {
+            type Node = N;
+            type Rc = Rc;
+
+            #[inline]
+            fn get(
+                &self,
+                k: &<Self::Node as Node>::Id,
+            ) -> Option<&Self::Rc>
+            {
+                StdHashMap::get(&self.0, k)
+            }
+
+            #[inline]
+            fn insert(
+                &mut self,
+                k: N::Id,
+                v: Self::Rc,
+            )
+            {
+                drop(StdHashMap::insert(&mut self.0, k, v));
+            }
+        }
+    }
+}
+
+
 #[cfg(test)]
 mod tests
 {
+    #[allow(unused_imports)]
     use super::*;
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn eq_rep()
     {
-        fn rep(weight: usize) -> Rc<Cell<Class>>
+        use premade::Rc;
+
+        fn rep(weight: usize) -> Rc
         {
             Rc::new(Cell::new(Class::Representative { weight }))
         }
@@ -306,10 +452,13 @@ mod tests
         }
     }
 
+    #[cfg(feature = "alloc")]
     #[test]
     fn get_rep()
     {
-        fn link(next: &Rc<Cell<Class>>) -> Rc<Cell<Class>>
+        use premade::Rc;
+
+        fn link(next: &Rc) -> Rc
         {
             let new = Class::new();
             Class::set_link(&new, Rc::clone(next));
@@ -336,10 +485,48 @@ mod tests
         assert!(!Class::eq_rep(&Class::get_rep(&link7), &rep1));
     }
 
+    #[cfg(feature = "std")]
     #[test]
     fn same_class()
     {
-        let mut ec = EquivClasses::new();
+        use premade::HashMap;
+
+        struct CharKeyed;
+
+        #[allow(clippy::unreachable)]
+        impl Node for CharKeyed
+        {
+            type Id = char;
+            type Index = u8;
+
+            fn id(&self) -> Self::Id
+            {
+                unreachable!()
+            }
+
+            fn amount_edges(&self) -> Self::Index
+            {
+                unreachable!()
+            }
+
+            fn get_edge(
+                &self,
+                _index: &Self::Index,
+            ) -> Self
+            {
+                unreachable!()
+            }
+
+            fn equiv_modulo_edges(
+                &self,
+                _other: &Self,
+            ) -> bool
+            {
+                unreachable!()
+            }
+        }
+
+        let mut ec = EquivClasses::<HashMap<CharKeyed>>::new();
         let keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
         assert!(!ec.same_class(&keys[0], &keys[1]));

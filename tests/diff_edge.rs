@@ -29,7 +29,7 @@ struct My(Kind);
 // called directly.
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-enum Kind
+pub enum Kind
 {
     A(My1),
     B(My2),
@@ -37,11 +37,11 @@ enum Kind
 }
 
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct My1(Rc<Datum1>);
+pub struct My1(Rc<Datum1>);
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct My2(Rc<Datum2>);
+pub struct My2(Rc<Datum2>);
 #[derive(PartialEq, Eq, Clone, Debug)]
-struct My3(Rc<Datum3>);
+pub struct My3(Rc<Datum3>);
 
 impl Node for My
 {
@@ -237,7 +237,7 @@ impl Pair for Kind
     }
 }
 
-struct KindAllocator;
+pub struct KindAllocator;
 
 impl KindAllocator
 {
