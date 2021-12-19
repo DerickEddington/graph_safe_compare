@@ -43,7 +43,6 @@
     trivial_casts,
     trivial_numeric_casts,
     unreachable_pub,
-    // unused_crate_dependencies, // annoying hits for dev-dependencies
     unused_extern_crates,
     unused_import_braces,
     unused_lifetimes,
@@ -51,6 +50,8 @@
     unused_results,
     variant_size_differences,
 )]
+// Warn about this one but avoid annoying hits for dev-dependencies.
+#![cfg_attr(not(test), warn(unused_crate_dependencies))]
 // Exclude (re-allow) undesired lints included in above groups.
 #![allow(
     clippy::implicit_return,
