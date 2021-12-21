@@ -12,12 +12,20 @@ edition = "2021"
 exclude = ["test_no_std"]
 
 [features]
-default = ["std"]
+default = ["std", "fastrand"]
 std = ["alloc"]
 alloc = []
+wyrng = ["wyhash"]
 
+# Your choice of (pseudo)random-number generator.  If your project is already
+# using one, you could choose that same one, to have only a single (P)RNG
+# dependency.  It is easy to add one that was not already here, if you want, by
+# adding a module to `src/cycle_safe/modes/interleave/random/mod.rs`.
 [dependencies]
-fastrand = "1"
+fastrand = { version = "1", optional = true }
+# The below support `no_std` and are configured as such here.
+oorandom = { version = "11", optional = true }
+wyhash = { version = "0.5", optional = true }
 
 [dev-dependencies]
 tests_utils = { path = "tests_utils" }

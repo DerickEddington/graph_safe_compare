@@ -30,5 +30,6 @@ test = false  # Prevent trying to build as a test harness without `panic="abort"
 bench = false # Ditto.
 
 [dependencies]
+# Note: You must choose which RNG by giving `--features cycle_deep_safe_compare/$RNG`
 cycle_deep_safe_compare = { path = "..", default-features = false }
 libc = { version = "0.2", default-features = false }

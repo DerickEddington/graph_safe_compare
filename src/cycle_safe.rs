@@ -49,26 +49,39 @@ pub mod modes
     /// "fast" phase.
     pub mod interleave
     {
-        use crate::{
-            basic::modes::limited::Limited,
-            generic::{
-                equiv::{
-                    Descend,
-                    Equiv,
+        /// The "interleave" mode requires (pseudo)random numbers, to randomly vary the limit of
+        /// the "fast" phase.
+        mod random;
+
+        use {
+            crate::{
+                basic::modes::limited::Limited,
+                generic::{
+                    equiv::{
+                        Descend,
+                        Equiv,
+                    },
+                    equiv_classes::{
+                        EquivClasses,
+                        Table,
+                    },
+                    recursion::Reset,
                 },
-                equiv_classes::{
-                    EquivClasses,
-                    Table,
-                },
-                recursion::Reset,
+                Node,
             },
-            Node,
+            core::num::NonZeroU16,
+            random::chosen::RandomNumberGenerator,
         };
 
         // TODO: These values are from the paper, which is for Scheme.  Other values might be more
         // optimal for this Rust variation?
         pub(crate) const PRE_LIMIT: u16 = 400;
-        pub(crate) const FAST_LIMIT: u16 = 2 * PRE_LIMIT;
+        pub(crate) const FAST_LIMIT_RANGE_END: NonZeroU16 =
+            match NonZeroU16::new(2 * PRE_LIMIT + 1) {
+                    Some(v) => v,
+                    #[allow(clippy::panic)]
+                    None => panic!(),
+                };
         #[allow(clippy::integer_division)]
         pub(crate) const SLOW_LIMIT: u16 = PRE_LIMIT / 10;
         #[allow(clippy::as_conversions)]
@@ -82,6 +95,8 @@ pub mod modes
             /// Table of nodes that have already been seen and recorded as equivalent, for use by
             /// the "slow" phase.
             equiv_classes: EquivClasses<T>,
+            /// State of the (P)RNG that is used to vary the limit of the "fast" phase.
+            rng:           RandomNumberGenerator,
         }
 
         impl<T: Default, S> Equiv<Interleave<T>, S>
@@ -95,7 +110,10 @@ pub mod modes
             {
                 Self {
                     ticker: -1,
-                    mode: Interleave { equiv_classes: EquivClasses::new() },
+                    mode: Interleave {
+                        equiv_classes: EquivClasses::new(),
+                        rng:           RandomNumberGenerator::default(),
+                    },
                     recur_stack,
                 }
             }
@@ -129,11 +147,6 @@ pub mod modes
                 b: &Self::Node,
             ) -> bool
             {
-                fn rand(max: u16) -> i32
-                {
-                    fastrand::i32(0 ..= max.into())
-                }
-
                 match self.ticker {
                     // "fast" phase
                     0 .. => true,
@@ -143,11 +156,14 @@ pub mod modes
                         if self.mode.equiv_classes.same_class(&a.id(), &b.id()) {
                             // This is what prevents traversing descendents that have already been
                             // checked, which prevents infinite loops on cycles and is more
-                            // efficient on shared structure.  Reset the ticker so that "slow"
-                            // will be used for longer, "on the theory that if one equivalence is
-                            // found, more are likely to be found" (which is critical for avoiding
-                            // stack overflow with shapes like "degenerate cyclic").
+                            // efficient on shared structure.
+
+                            // Reset the ticker so that "slow" will be used for longer, "on the
+                            // theory that if one equivalence is found, more are likely to be
+                            // found" (which is critical for avoiding stack overflow with shapes
+                            // like "degenerate cyclic").
                             self.ticker = -1;
+
                             false
                         }
                         else {
@@ -159,7 +175,18 @@ pub mod modes
                         // Random limits for "fast" "reduce the likelihood of repeatedly tripping
                         // on worst-case behavior in cases where the sizes of the input graphs
                         // happen to be related to the chosen bounds in a bad way".
-                        self.ticker = rand(FAST_LIMIT);
+
+                        self.ticker = random::NumberGenerator::rand_upto(
+                            // Call the trait method as a direct function call (instead of method
+                            // call) so that the `RandomNumberGenerator` type (chosen by package
+                            // feature) is required to `impl` the trait (instead of working if it
+                            // accidentally has only an inherent implementation of a method with
+                            // the same signature).
+                            &mut self.mode.rng,
+                            FAST_LIMIT_RANGE_END,
+                        )
+                        .into();
+
                         true
                     },
                 }
