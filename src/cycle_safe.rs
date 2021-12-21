@@ -78,10 +78,10 @@ pub mod modes
         pub(crate) const PRE_LIMIT: u16 = 400;
         pub(crate) const FAST_LIMIT_RANGE_END: NonZeroU16 =
             match NonZeroU16::new(2 * PRE_LIMIT + 1) {
-                    Some(v) => v,
-                    #[allow(clippy::panic)]
-                    None => panic!(),
-                };
+                Some(v) => v,
+                #[allow(clippy::panic)]
+                None => panic!(),
+            };
         #[allow(clippy::integer_division)]
         pub(crate) const SLOW_LIMIT: u16 = PRE_LIMIT / 10;
         #[allow(clippy::as_conversions)]
