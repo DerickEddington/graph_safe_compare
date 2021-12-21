@@ -44,6 +44,7 @@ mod premade
         N: Node,
         T: Table<Node = N>,
         SP: Default + Reset + Into<SI>,
+        SI: Reset,
         Equiv<Limited<N>, SP>: Descend<Node = N> + Recur<SP, Node = N>,
         Equiv<Interleave<T>, SI>: Descend<Node = N> + Recur<SI, Node = N>,
     {
@@ -66,12 +67,15 @@ pub mod recursion
     /// An aborted precheck, that uses particular types of recursion-stacks, might leave some
     /// elements on such a stack, in which case it needs to be reset before doing the interleave
     /// using the same stack.
+    ///
+    /// Also, some things that take ownership of a `Self` might call this to ensure a stack is in
+    /// a fresh state.
     pub trait Reset
     {
         /// Reset a `Self` as appropriate.
         ///
-        /// When it is more efficient, the same `self` value should be reset and then returned.
-        /// But a newly-created value may be returned if desired.
+        /// When it is more efficient, the `self` value should be reset and then returned.  But a
+        /// newly-created value may be returned if desired.
         fn reset(self) -> Self;
     }
 }

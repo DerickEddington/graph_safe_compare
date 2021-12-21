@@ -99,22 +99,21 @@ pub mod modes
             rng:           RandomNumberGenerator,
         }
 
-        impl<T: Default, S> Equiv<Interleave<T>, S>
+        impl<T: Default, S: Reset> Equiv<Interleave<T>, S>
         {
             /// Create a new state for an invocation of the [`Interleave`] mode of the algorithm.
             ///
-            /// The given `recur_stack` type determines how the algorithm will do its recursions,
-            /// and the value must be new or [`Reset`].
+            /// The given `recur_stack` type determines how the algorithm will do its recursions.
             #[inline]
             pub fn new(recur_stack: S) -> Self
             {
                 Self {
-                    ticker: -1,
-                    mode: Interleave {
+                    ticker:      -1,
+                    mode:        Interleave {
                         equiv_classes: EquivClasses::new(),
                         rng:           RandomNumberGenerator::default(),
                     },
-                    recur_stack,
+                    recur_stack: recur_stack.reset(),
                 }
             }
         }
@@ -122,13 +121,16 @@ pub mod modes
         /// Enables the same recursion-stack value to be reused across the precheck and the
         /// interleave, which is more efficient for some types since this avoids dropping it and
         /// creating another.
-        impl<SP, SI, N, T: Default> From<Equiv<Limited<N>, SP>> for Equiv<Interleave<T>, SI>
-        where SP: Reset + Into<SI>
+        impl<SP, SI, N, T> From<Equiv<Limited<N>, SP>> for Equiv<Interleave<T>, SI>
+        where
+            SP: Into<SI>,
+            SI: Reset,
+            T: Default,
         {
             #[inline]
             fn from(prechecker: Equiv<Limited<N>, SP>) -> Self
             {
-                Self::new(prechecker.recur_stack.reset().into())
+                Self::new(prechecker.recur_stack.into())
             }
         }
 

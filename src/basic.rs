@@ -121,9 +121,12 @@ pub mod modes
     {
         use {
             crate::{
-                generic::equiv::{
-                    Descend,
-                    Equiv,
+                generic::{
+                    equiv::{
+                        Descend,
+                        Equiv,
+                    },
+                    recursion::Reset,
                 },
                 Node,
             },
@@ -137,20 +140,23 @@ pub mod modes
             _node_type: PhantomData<N>,
         }
 
-        impl<N, S> Equiv<Unlimited<N>, S>
+        impl<N, S: Reset> Equiv<Unlimited<N>, S>
         {
             /// Create a new state for an invocation of the [`Unlimited`] mode of the algorithm.
             ///
-            /// The given `recur_stack` type determines how the algorithm will do its recursions,
-            /// and the value must be new or [`Reset`](crate::generic::recursion::Reset).
+            /// The given `recur_stack` type determines how the algorithm will do its recursions.
             #[inline]
             pub fn new(recur_stack: S) -> Self
             {
-                Self { ticker: 0, mode: Unlimited { _node_type: PhantomData }, recur_stack }
+                Self {
+                    ticker:      0,
+                    mode:        Unlimited { _node_type: PhantomData },
+                    recur_stack: recur_stack.reset(),
+                }
             }
         }
 
-        impl<N, S: Default> Default for Equiv<Unlimited<N>, S>
+        impl<N, S: Default + Reset> Default for Equiv<Unlimited<N>, S>
         {
             #[inline]
             fn default() -> Self
@@ -189,10 +195,13 @@ pub mod modes
     {
         use {
             crate::{
-                generic::equiv::{
-                    Descend,
-                    Equiv,
-                    Recur,
+                generic::{
+                    equiv::{
+                        Descend,
+                        Equiv,
+                        Recur,
+                    },
+                    recursion::Reset,
                 },
                 Node,
             },
@@ -209,19 +218,22 @@ pub mod modes
             _node_type: PhantomData<N>,
         }
 
-        impl<N, S> Equiv<Limited<N>, S>
+        impl<N, S: Reset> Equiv<Limited<N>, S>
         {
             /// Create a new state for an invocation of the [`Limited`] mode of the algorithm.
             ///
-            /// The given `recur_stack` type determines how the algorithm will do its recursions,
-            /// and the value must be new or [`Reset`](crate::generic::recursion::Reset).
+            /// The given `recur_stack` type determines how the algorithm will do its recursions.
             #[inline]
             pub fn new(
                 limit: i32,
                 recur_stack: S,
             ) -> Self
             {
-                Self { ticker: limit, mode: Limited { _node_type: PhantomData }, recur_stack }
+                Self {
+                    ticker:      limit,
+                    mode:        Limited { _node_type: PhantomData },
+                    recur_stack: recur_stack.reset(),
+                }
             }
         }
 
