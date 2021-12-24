@@ -1,55 +1,81 @@
-use {
-    self::{
-        modes::{
-            limited::Limited,
-            unlimited::Unlimited,
-        },
-        recursion::callstack::CallStack,
-    },
-    crate::{
-        generic::equiv::{
-            Aborted,
-            Equiv,
-        },
-        Node,
-    },
-};
+pub use premade::*;
 
-
-/// Equivalence predicate that cannot handle cyclic nor very-deep graphs, and that has the least
-/// overhead.
-///
-/// This is similar to `#[derive(PartialEq)]` and so usually is not better than that, but could be
-/// useful for types where implementing [`Node`] in peculiar ways is useful for having different
-/// behavior than derived `PartialEq`.
-#[inline]
-pub fn equiv<N: Node>(
-    a: &N,
-    b: &N,
-) -> bool
+mod premade
 {
-    let mut e = Equiv::<Unlimited<N>, _>::new(CallStack);
-    e.is_equiv(a, b)
-}
+    use {
+        super::{
+            modes::{
+                limited::{
+                    Limited,
+                    Ticker,
+                },
+                unlimited::Unlimited,
+            },
+            recursion::callstack::CallStack,
+        },
+        crate::{
+            generic::equiv::{
+                self,
+                Aborted,
+                Equiv,
+            },
+            Node,
+        },
+        core::marker::PhantomData,
+    };
 
 
-// TODO: The `limit` should not be `i32`, and instead should be unsigned and generic, which will
-// require changes to `Equiv`.
-/// Equivalence predicate that limits how many node edges are descended, and that aborts early if
-/// the limit is reached.  Like [`equiv`], this cannot handle cyclic nor very-deep graphs and has
-/// minimal overhead.
-///
-/// # Errors
-/// If the limit is reached before completing, return `Err(Aborted)`.
-#[inline]
-pub fn limited_equiv<N: Node>(
-    limit: i32,
-    a: &N,
-    b: &N,
-) -> Result<bool, Aborted>
-{
-    let mut e = Equiv::<Limited<N>, _>::new(limit, CallStack);
-    e.equiv(a, b)
+    /// Equivalence predicate that cannot handle cyclic nor very-deep graphs, and that has the
+    /// least overhead.
+    ///
+    /// This is similar to `#[derive(PartialEq)]` and so usually is not better than that, but
+    /// could be useful for types where implementing [`Node`] in peculiar ways is useful for
+    /// having different behavior than derived `PartialEq`.
+    #[inline]
+    pub fn equiv<N: Node>(
+        a: &N,
+        b: &N,
+    ) -> bool
+    {
+        struct Args<N>(PhantomData<N>);
+
+        impl<N: Node> equiv::Params for Args<N>
+        {
+            type DescendMode = Unlimited;
+            type Node = N;
+            type RecurStack = CallStack;
+        }
+
+        let mut e = Equiv::<Args<N>>::default();
+        e.is_equiv(a, b)
+    }
+
+
+    /// Equivalence predicate that limits how many node edges are descended, and that aborts early
+    /// if the limit is reached.  Like [`equiv`](equiv()), this cannot handle cyclic nor very-deep
+    /// graphs and has minimal overhead.
+    ///
+    /// # Errors
+    /// If the limit is reached before completing, return `Err(Aborted)`.
+    #[inline]
+    pub fn limited_equiv<N: Node, L: Ticker>(
+        limit: L,
+        a: &N,
+        b: &N,
+    ) -> Result<bool, Aborted>
+    {
+        struct Args<N, L>(PhantomData<(N, L)>);
+
+        impl<N: Node, L: Ticker> equiv::Params for Args<N, L>
+        {
+            type DescendMode = Limited<L>;
+            type Node = N;
+            type RecurStack = CallStack;
+        }
+
+        let mut e = Equiv::<Args<N, L>>::new(Limited(limit));
+        e.equiv(a, b)
+    }
 }
 
 
@@ -59,17 +85,11 @@ pub mod recursion
     /// Use the normal call-stack for the recursions done to descend node edges.
     pub mod callstack
     {
-        use crate::{
-            generic::{
-                equiv::{
-                    Aborted,
-                    Descend,
-                    Equiv,
-                    Recur,
-                },
-                recursion::Reset,
-            },
-            Node,
+        use crate::generic::equiv::{
+            self,
+            Aborted,
+            Equiv,
+            RecurStack,
         };
 
         /// Specifies use of the normal call-stack.
@@ -77,37 +97,32 @@ pub mod recursion
         #[non_exhaustive]
         pub struct CallStack;
 
-        /// Only for compatibility with generic uses of recursion-stack types.  The call-stack
-        /// does not need to be reset, so this is a no-op for this type.
-        impl Reset for CallStack
+        /// Enables [`CallStack`] to be used with the algorithm.
+        impl<P> RecurStack<P> for CallStack
+        where P: equiv::Params<RecurStack = Self>
         {
+            #[inline]
+            fn recur(
+                it: &mut Equiv<P>,
+                a: P::Node,
+                b: P::Node,
+            ) -> Result<bool, Aborted>
+            {
+                it.equiv_main(&a, &b)
+            }
+
+            #[inline]
+            fn next(&mut self) -> Option<(P::Node, P::Node)>
+            {
+                None
+            }
+
+            /// Only for compatibility with generic uses of recursion-stack types.  The call-stack
+            /// does not need to be reset, so this is a no-op for this type.
             #[inline]
             fn reset(self) -> Self
             {
                 self
-            }
-        }
-
-        /// Enables [`CallStack`] to be used with the algorithm.
-        impl<N: Node, M> Recur<CallStack> for Equiv<M, CallStack>
-        where Self: Descend<Node = N>
-        {
-            type Node = N;
-
-            #[inline]
-            fn recur(
-                &mut self,
-                a: Self::Node,
-                b: Self::Node,
-            ) -> Result<bool, Aborted>
-            {
-                self.equiv_main(&a, &b)
-            }
-
-            #[inline]
-            fn next(&mut self) -> Option<(Self::Node, Self::Node)>
-            {
-                None
             }
         }
     }
@@ -119,63 +134,26 @@ pub mod modes
     /// Do not limit the algorithm in how many node edges are descended, and never abort early.
     pub mod unlimited
     {
-        use {
-            crate::{
-                generic::{
-                    equiv::{
-                        Descend,
-                        Equiv,
-                    },
-                    recursion::Reset,
-                },
-                Node,
-            },
-            core::marker::PhantomData,
+        use crate::generic::equiv::{
+            self,
+            DescendMode,
         };
 
         /// Specifies not limiting the amount of node edges descended.
-        pub struct Unlimited<N>
-        {
-            /// Some `impl`s need `N` to be constrained by `Self`.
-            _node_type: PhantomData<N>,
-        }
-
-        impl<N, S: Reset> Equiv<Unlimited<N>, S>
-        {
-            /// Create a new state for an invocation of the [`Unlimited`] mode of the algorithm.
-            ///
-            /// The given `recur_stack` type determines how the algorithm will do its recursions.
-            #[inline]
-            pub fn new(recur_stack: S) -> Self
-            {
-                Self {
-                    ticker:      0,
-                    mode:        Unlimited { _node_type: PhantomData },
-                    recur_stack: recur_stack.reset(),
-                }
-            }
-        }
-
-        impl<N, S: Default + Reset> Default for Equiv<Unlimited<N>, S>
-        {
-            #[inline]
-            fn default() -> Self
-            {
-                Self::new(S::default())
-            }
-        }
+        #[derive(Default)]
+        #[allow(clippy::exhaustive_structs)]
+        pub struct Unlimited;
 
         /// Enables [`Unlimited`] to be used with the algorithm.
-        impl<N: Node, S> Descend for Equiv<Unlimited<N>, S>
+        impl<P> DescendMode<P> for Unlimited
+        where P: equiv::Params<DescendMode = Self>
         {
-            type Node = N;
-
             /// Always start handling node edges.
             #[inline]
             fn do_edges(
                 &mut self,
-                _a: &Self::Node,
-                _b: &Self::Node,
+                _a: &P::Node,
+                _b: &P::Node,
             ) -> bool
             {
                 true
@@ -193,60 +171,43 @@ pub mod modes
     /// Limit the algorithm in how many node edges it is allowed to descend before aborting early.
     pub mod limited
     {
+        mod sealed
+        {
+            use core::ops::SubAssign;
+
+            /// Any type of unsigned integer may be used with [`Limited`](super::Limited).
+            pub trait Ticker: Ord + From<u8> + SubAssign {}
+            impl Ticker for u8 {}
+            impl Ticker for u16 {}
+            impl Ticker for u32 {}
+            impl Ticker for u64 {}
+            impl Ticker for u128 {}
+        }
+
+        pub(in super::super) use sealed::Ticker;
         use {
-            crate::{
-                generic::{
-                    equiv::{
-                        Descend,
-                        Equiv,
-                        Recur,
-                    },
-                    recursion::Reset,
-                },
-                Node,
+            crate::generic::equiv::{
+                self,
+                DescendMode,
+                Equiv,
             },
-            core::{
-                marker::PhantomData,
-                ops::ControlFlow,
-            },
+            core::ops::ControlFlow,
         };
 
-        /// Specifies limiting the amount of node edges descended.
-        pub struct Limited<N>
-        {
-            /// Some `impl`s need `N` to be constrained by `Self`.
-            _node_type: PhantomData<N>,
-        }
+        /// Specifies limiting the amount of node edges descended.  The inner value is the limit.
+        #[allow(clippy::exhaustive_structs)]
+        pub struct Limited<T>(pub T);
 
-        impl<N, S: Reset> Equiv<Limited<N>, S>
-        {
-            /// Create a new state for an invocation of the [`Limited`] mode of the algorithm.
-            ///
-            /// The given `recur_stack` type determines how the algorithm will do its recursions.
-            #[inline]
-            pub fn new(
-                limit: i32,
-                recur_stack: S,
-            ) -> Self
-            {
-                Self {
-                    ticker:      limit,
-                    mode:        Limited { _node_type: PhantomData },
-                    recur_stack: recur_stack.reset(),
-                }
-            }
-        }
-
-        impl<N: Node, S> Equiv<Limited<N>, S>
-        where Self: Descend<Node = N> + Recur<S, Node = N>
+        impl<T, P> Equiv<P>
+        where P: equiv::Params<DescendMode = Limited<T>>
         {
             /// Intended for uses where early abort due to reaching the limit should cause control
             /// to continue on to some other attempt.
             #[inline]
             pub fn precheck_equiv(
                 &mut self,
-                a: &N,
-                b: &N,
+                a: &P::Node,
+                b: &P::Node,
             ) -> ControlFlow<bool, ()>
             {
                 self.equiv(a, b).map_or(ControlFlow::Continue(()), ControlFlow::Break)
@@ -254,16 +215,17 @@ pub mod modes
         }
 
         /// Enables [`Limited`] to be used with the algorithm.
-        impl<N: Node, S> Descend for Equiv<Limited<N>, S>
+        impl<T, P> DescendMode<P> for Limited<T>
+        where
+            T: Ticker,
+            P: equiv::Params<DescendMode = Self>,
         {
-            type Node = N;
-
             /// Always start handling node edges.
             #[inline]
             fn do_edges(
                 &mut self,
-                _a: &Self::Node,
-                _b: &Self::Node,
+                _a: &P::Node,
+                _b: &P::Node,
             ) -> bool
             {
                 true
@@ -273,7 +235,13 @@ pub mod modes
             #[inline]
             fn do_recur(&mut self) -> bool
             {
-                self.ticker >= 0
+                if self.0 > 0.into() {
+                    self.0 -= 1.into();
+                    true
+                }
+                else {
+                    false
+                }
             }
         }
     }
@@ -293,12 +261,14 @@ mod tests
         },
         crate::{
             generic::equiv::{
+                self,
                 Aborted,
                 Equiv,
             },
             Node,
         },
         alloc::boxed::Box,
+        core::marker::PhantomData,
     };
 
     enum Datum
@@ -371,37 +341,46 @@ mod tests
         #[derive(PartialEq, Eq, Debug)]
         enum ResultLimit
         {
-            True(i32),
-            False(i32),
-            Abort(i32),
+            True(u32),
+            False(u32),
+            Abort(u32),
         }
 
         fn eqv(
             a: &Datum,
             b: &Datum,
-            limit: i32,
+            limit: u32,
         ) -> ResultLimit
         {
-            let mut e = Equiv::<Limited<&Datum>, CallStack>::new(limit, CallStack);
+            struct LimitedArgs<'l>(PhantomData<&'l ()>);
+
+            impl<'l> equiv::Params for LimitedArgs<'l>
+            {
+                type DescendMode = Limited<u32>;
+                type Node = &'l Datum;
+                type RecurStack = CallStack;
+            }
+
+            let mut e = Equiv::<LimitedArgs<'_>>::new(Limited(limit));
 
             match e.equiv(a, b) {
-                Ok(true) => True(e.ticker),
-                Ok(false) => False(e.ticker),
-                Err(Aborted) => Abort(e.ticker),
+                Ok(true) => True(e.descend_mode.0),
+                Ok(false) => False(e.descend_mode.0),
+                Err(Aborted) => Abort(e.descend_mode.0),
             }
         }
 
         use ResultLimit::*;
 
         assert_eq!(eqv(&leaf(), &leaf(), 42), True(42));
-        assert_eq!(eqv(&leaf(), &leaf(), -1), True(-1));
+        assert_eq!(eqv(&leaf(), &leaf(), 0), True(0));
         assert_eq!(eqv(&leaf(), &end_pair(), 42), False(42));
         assert_eq!(eqv(&end_pair(), &leaf(), 42), False(42));
         assert_eq!(eqv(&end_pair(), &end_pair(), 7), True(5));
         assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 7), True(3));
-        assert_eq!(eqv(&end_pair(), &end_pair(), 0), Abort(-1));
-        assert_eq!(eqv(&end_pair(), &end_pair(), 1), Abort(-1));
-        assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 1), Abort(-1));
+        assert_eq!(eqv(&end_pair(), &end_pair(), 0), Abort(0));
+        assert_eq!(eqv(&end_pair(), &end_pair(), 1), Abort(0));
+        assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 1), Abort(0));
         assert_eq!(eqv(&pair(leaf(), leaf()), &pair(leaf(), end_pair()), 42), False(40));
         assert_eq!(
             {

@@ -185,18 +185,11 @@ pub trait Table: Default
 }
 
 /// The classes of the nodes that are known to be equivalent, for an invocation of the algorithm.
+#[derive(Default)]
 pub(crate) struct EquivClasses<T>
 {
     /// Table that associates nodes by ID with their equivalence class.
     table: T,
-}
-
-impl<T: Default> EquivClasses<T>
-{
-    pub(crate) fn new() -> Self
-    {
-        Self { table: T::default() }
-    }
 }
 
 impl<T: Table> EquivClasses<T>
@@ -328,36 +321,46 @@ pub mod premade
 
         extern crate alloc;
 
-        use {
-            super::super::Class,
-            core::{
-                cell::Cell,
-                ops::Deref,
-            },
-        };
-
-        /// Enables standard [`Rc`](alloc::rc::Rc) to be used as an
-        /// [`equiv_classes::Rc`](super::super::Rc), which requires this recursive type.
-        #[derive(Clone)]
-        pub struct Rc(alloc::rc::Rc<Cell<Class<Self>>>);
-
-        impl Deref for Rc
+        /// Support for standard [`Rc`](alloc::rc::Rc).
+        pub mod rc
         {
-            type Target = Cell<Class<Self>>;
+            use {
+                super::{
+                    super::super::{
+                        Class,
+                        Rc as RcTrait,
+                    },
+                    alloc,
+                },
+                core::{
+                    cell::Cell,
+                    ops::Deref,
+                },
+            };
 
-            #[inline]
-            fn deref(&self) -> &Self::Target
+            /// Enables standard [`Rc`](alloc::rc::Rc) to be used as an
+            /// [`equiv_classes::Rc`](RcTrait), which requires this recursive type.
+            #[derive(Clone)]
+            pub struct Rc(alloc::rc::Rc<Cell<Class<Self>>>);
+
+            impl Deref for Rc
             {
-                &*self.0
+                type Target = Cell<Class<Self>>;
+
+                #[inline]
+                fn deref(&self) -> &Self::Target
+                {
+                    &*self.0
+                }
             }
-        }
 
-        impl super::super::Rc for Rc
-        {
-            #[inline]
-            fn new(val: Cell<Class<Self>>) -> Self
+            impl RcTrait for Rc
             {
-                Self(alloc::rc::Rc::new(val))
+                #[inline]
+                fn new(val: Cell<Class<Self>>) -> Self
+                {
+                    Self(alloc::rc::Rc::new(val))
+                }
             }
         }
     }
@@ -369,50 +372,78 @@ pub mod premade
 
         extern crate std;
 
-        use {
-            super::{
-                super::Table,
-                Rc,
-            },
-            crate::Node,
-            std::collections::HashMap as StdHashMap,
-        };
-
-        /// Eases using standard [`HashMap`](StdHashMap) as an [`equiv_classes::Table`](Table)
-        /// that uses [`Rc`].
-        pub struct HashMap<N: Node>(StdHashMap<N::Id, Rc>);
-
-        impl<N: Node> Default for HashMap<N>
+        /// Support for standard [`HashMap`](std::collections::HashMap).
+        pub mod hash_map
         {
-            #[inline]
-            fn default() -> Self
-            {
-                Self(StdHashMap::default())
-            }
-        }
+            use {
+                super::{
+                    super::{
+                        super::Table as TableTrait,
+                        rc::Rc,
+                    },
+                    std,
+                },
+                crate::Node,
+                std::collections::HashMap,
+            };
 
-        impl<N: Node> Table for HashMap<N>
-        {
-            type Node = N;
-            type Rc = Rc;
-
-            #[inline]
-            fn get(
-                &self,
-                k: &<Self::Node as Node>::Id,
-            ) -> Option<&Self::Rc>
+            /// Generic parameters of [`Table`] and its operations.
+            pub trait Params
             {
-                StdHashMap::get(&self.0, k)
+                /// Amount of elements (i.e. branch (non-leaf) nodes) that a table can grow to
+                /// contain initially before reallocating.
+                ///
+                /// The default value is a balance between being somewhat large to avoid excessive
+                /// reallocations and not being too huge that it often consumes excessive memory.
+                /// If the default is not good for your use case, a custom `impl` of [`Params`]
+                /// may be made with a more-appropriate value - either smaller or larger.  Note
+                /// that the default only affects the initial capacity of the underlying
+                /// [`HashMap`], and it will still grow as large as needed regardless by
+                /// reallocating.
+                const INITIAL_CAPACITY: usize = 2_usize.pow(12);
+                /// Type of node that is recorded in the table.  Must be the same as used with the
+                /// corresponding [`equiv::Params`](crate::generic::equiv::Params).
+                type Node: Node;
             }
 
-            #[inline]
-            fn insert(
-                &mut self,
-                k: N::Id,
-                v: Self::Rc,
-            )
+            /// Eases using standard [`HashMap`] as an [`equiv_classes::Table`](TableTrait) that
+            /// uses [`Rc`].
+            pub struct Table<P: Params>(HashMap<<P::Node as Node>::Id, Rc>);
+
+            impl<P: Params> Default for Table<P>
             {
-                drop(StdHashMap::insert(&mut self.0, k, v));
+                /// Create a new instance with capacity
+                /// [`P::INITIAL_CAPACITY`](Params::INITIAL_CAPACITY).
+                #[inline]
+                fn default() -> Self
+                {
+                    Self(HashMap::with_capacity(P::INITIAL_CAPACITY))
+                }
+            }
+
+            impl<P: Params> TableTrait for Table<P>
+            {
+                type Node = P::Node;
+                type Rc = Rc;
+
+                #[inline]
+                fn get(
+                    &self,
+                    k: &<Self::Node as Node>::Id,
+                ) -> Option<&Self::Rc>
+                {
+                    HashMap::get(&self.0, k)
+                }
+
+                #[inline]
+                fn insert(
+                    &mut self,
+                    k: <Self::Node as Node>::Id,
+                    v: Self::Rc,
+                )
+                {
+                    drop(HashMap::insert(&mut self.0, k, v));
+                }
             }
         }
     }
@@ -429,7 +460,7 @@ mod tests
     #[test]
     fn eq_rep()
     {
-        use premade::Rc;
+        use premade::rc::Rc;
 
         fn rep(weight: usize) -> Rc
         {
@@ -456,7 +487,7 @@ mod tests
     #[test]
     fn get_rep()
     {
-        use premade::Rc;
+        use premade::rc::Rc;
 
         fn link(next: &Rc) -> Rc
         {
@@ -489,7 +520,17 @@ mod tests
     #[test]
     fn same_class()
     {
-        use premade::HashMap;
+        use premade::hash_map::{
+            Params,
+            Table,
+        };
+
+        struct Args;
+
+        impl Params for Args
+        {
+            type Node = CharKeyed;
+        }
 
         struct CharKeyed;
 
@@ -526,7 +567,7 @@ mod tests
             }
         }
 
-        let mut ec = EquivClasses::<HashMap<CharKeyed>>::new();
+        let mut ec = EquivClasses::<Table<Args>>::default();
         let keys = ['a', 'b', 'c', 'd', 'e', 'f', 'g'];
 
         assert!(!ec.same_class(&keys[0], &keys[1]));

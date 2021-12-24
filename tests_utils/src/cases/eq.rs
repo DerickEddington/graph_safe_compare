@@ -251,7 +251,7 @@ macro_rules! eq_variations_tests
                 b: &N,
             ) -> bool
             {
-                const LIMIT: i32 = 50;
+                const LIMIT: u32 = 50;
                 matches!(cycle_deep_safe_compare::basic::limited_equiv(LIMIT, a, b), Ok(true))
             }
 
@@ -347,18 +347,61 @@ macro_rules! eq_variations_tests
                 b: &N,
             ) -> bool
             {
-                use cycle_deep_safe_compare::{
-                    basic::recursion::callstack::CallStack,
-                    deep_safe::recursion::vecstack::VecStack,
-                    generic::{
-                        self,
-                        equiv_classes::premade::HashMap,
+                use {
+                    cycle_deep_safe_compare::{
+                        basic::recursion::callstack::CallStack,
+                        cycle_safe::modes::interleave::{
+                            self,
+                            random::default,
+                        },
+                        deep_safe::recursion::vecstack::{
+                            self,
+                            VecStack,
+                        },
+                        generic::{
+                            precheck_interleave,
+                            equiv_classes::premade::hash_map,
+                        },
                     },
+                    core::marker::PhantomData,
                 };
 
-                generic::precheck_interleave_equiv::<
-                        _, HashMap<_>, CallStack, VecStack<_>>(
-                    a, b)
+                struct Args<N>(PhantomData<N>);
+
+                impl<N: Node> precheck_interleave::Params<N> for Args<N>
+                {
+                    type PrecheckRecurStack = CallStack;
+                    type InterleaveRecurStack = VecStack<Self>;
+                    type InterleaveParams = Self;
+                }
+
+                impl<N: Node> vecstack::Params for Args<N>
+                {
+                    // Use custom value for this constant, not its default.
+                    const INITIAL_CAPACITY: usize = 1 << 10;
+                    type Node = N;
+                }
+
+                impl<N: Node> hash_map::Params for Args<N>
+                {
+                    // Use custom value for this constant, not its default.
+                    const INITIAL_CAPACITY: usize = 0;
+                    type Node = N;
+                }
+
+                impl<N: Node> interleave::Params for Args<N>
+                {
+                    // Use custom values for these constants, not their defaults.
+                    const PRECHECK_LIMIT: u16 = 321;
+                    const FAST_LIMIT_MAX: u16 = 3 * Self::PRECHECK_LIMIT;
+                    const SLOW_LIMIT: u16 = Self::PRECHECK_LIMIT / 5;
+
+                    type Node = N;
+                    type Table = hash_map::Table<Self>;
+                    type RNG = default::RandomNumberGenerator;
+                }
+
+                precheck_interleave::equiv::<_, Args<_>>(a, b)
             }
 
             mod precheck_interleave_callstack_vecstack
@@ -371,6 +414,5 @@ macro_rules! eq_variations_tests
                                          #[cfg(all())], #[cfg(all())]);
             }
         }
-
     };
 }

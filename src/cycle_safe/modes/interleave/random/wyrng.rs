@@ -7,10 +7,11 @@ use {
 
 /// Wrap a [`wyrng`] state value so that our traits can be `impl`ed on it.
 #[derive(Default)]
-pub(in super::super) struct RandomNumberGenerator(u64);
+pub struct RandomNumberGenerator(u64);
 
 impl super::NumberGenerator for RandomNumberGenerator
 {
+    #[inline]
     fn rand_upto(
         &mut self,
         exclusive_end: NonZeroU16,

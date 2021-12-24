@@ -1,9 +1,13 @@
 use {
     cycle_deep_safe_compare::{
         basic::recursion::callstack::CallStack,
+        cycle_safe::modes::interleave::{
+            self,
+            random,
+        },
         generic::{
-            equiv_classes::premade::HashMap,
-            precheck_interleave_equiv,
+            equiv_classes::premade::hash_map,
+            precheck_interleave,
         },
         robust,
         Node,
@@ -35,8 +39,30 @@ impl PartialEq for My
         other: &Self,
     ) -> bool
     {
-        let callstack =
-            precheck_interleave_equiv::<_, HashMap<_>, CallStack, CallStack>(self, other);
+        let callstack = {
+            struct Args;
+
+            impl precheck_interleave::Params<My> for Args
+            {
+                type InterleaveParams = Self;
+                type InterleaveRecurStack = CallStack;
+                type PrecheckRecurStack = CallStack;
+            }
+
+            impl hash_map::Params for Args
+            {
+                type Node = My;
+            }
+
+            impl interleave::Params for Args
+            {
+                type Node = My;
+                type RNG = random::default::RandomNumberGenerator;
+                type Table = hash_map::Table<Self>;
+            }
+
+            precheck_interleave::equiv::<_, Args>(self, other)
+        };
         let robust = robust::precheck_equiv(self, other);
         assert_eq!(callstack, robust);
         callstack

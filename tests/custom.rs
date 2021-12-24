@@ -109,13 +109,11 @@ mod custom_recur_stack
         alloc::collections::LinkedList,
         cycle_deep_safe_compare::{
             basic::recursion::callstack::CallStack,
-            generic::{
-                equiv::{
-                    Aborted,
-                    Equiv,
-                    Recur,
-                },
-                recursion::Reset,
+            generic::equiv::{
+                self,
+                Aborted,
+                Equiv,
+                RecurStack,
             },
         },
     };
@@ -123,28 +121,24 @@ mod custom_recur_stack
     #[derive(Default)]
     pub struct ListStack(LinkedList<(My, My)>);
 
-    impl<M> Recur<ListStack> for Equiv<M, ListStack>
+    impl<P> RecurStack<P> for ListStack
+    where P: equiv::Params<Node = My, RecurStack = Self>
     {
-        type Node = My;
-
         fn recur(
-            &mut self,
-            a: Self::Node,
-            b: Self::Node,
+            it: &mut Equiv<P>,
+            a: P::Node,
+            b: P::Node,
         ) -> Result<bool, Aborted>
         {
-            self.recur_stack.0.push_front((a, b));
+            it.recur_stack.0.push_front((a, b));
             Ok(true)
         }
 
-        fn next(&mut self) -> Option<(Self::Node, Self::Node)>
+        fn next(&mut self) -> Option<(P::Node, P::Node)>
         {
-            self.recur_stack.0.pop_front()
+            self.0.pop_front()
         }
-    }
 
-    impl Reset for ListStack
-    {
         fn reset(mut self) -> Self
         {
             self.0.clear();
@@ -162,7 +156,30 @@ mod custom_recur_stack
 }
 
 
-/// Use our custom `Table`, `Rc`, and `Recur` types.
+/// Use our own (dummy) PRNG to test not depending on any from the crate.
+mod custom_rng
+{
+    use cycle_deep_safe_compare::cycle_safe::modes::interleave::random;
+
+    #[derive(Default)]
+    pub struct PseudoPseudoRNG(u128);
+
+    impl random::NumberGenerator for PseudoPseudoRNG
+    {
+        fn rand_upto(
+            &mut self,
+            exclusive_end: std::num::NonZeroU16,
+        ) -> u16
+        {
+            self.0 = self.0.wrapping_mul(42);
+            self.0 = self.0.wrapping_add(987654321);
+            self.0 as u16 % exclusive_end
+        }
+    }
+}
+
+
+/// Use our custom `Table`, `Rc`, `RecurStack`, and `NumberGenerator` types.
 fn custom_equiv(
     a: &My,
     b: &My,
@@ -170,20 +187,56 @@ fn custom_equiv(
 {
     use {
         custom_recur_stack::ListStack,
+        custom_rng::PseudoPseudoRNG,
         cycle_deep_safe_compare::{
             basic::recursion::callstack::CallStack,
-            generic,
+            cycle_safe::modes::interleave,
+            generic::precheck_interleave,
         },
     };
+
+    struct InterleaveArgs;
+
+    impl interleave::Params for InterleaveArgs
+    {
+        type Node = My;
+        type RNG = PseudoPseudoRNG;
+        type Table = custom_table::Map;
+
+        // Use custom values for these constants, not their defaults.
+        const FAST_LIMIT_MAX: u16 = Self::PRECHECK_LIMIT / 4;
+        const PRECHECK_LIMIT: u16 = 2000;
+        const SLOW_LIMIT: u16 = Self::PRECHECK_LIMIT / 2;
+    }
 
     // Exercise the call-stack for the precheck since that is limited and will not overflow the
     // stack when the stack is already shallow, and use the list-stack for the interleave so great
     // depth is supported since an input could be very-deep.
-    let precheck_on_callstack =
-        generic::precheck_interleave_equiv::<_, custom_table::Map, CallStack, ListStack>(a, b);
+    let precheck_on_callstack = {
+        struct Args;
+
+        impl precheck_interleave::Params<My> for Args
+        {
+            type InterleaveParams = InterleaveArgs;
+            type InterleaveRecurStack = ListStack;
+            type PrecheckRecurStack = CallStack;
+        }
+
+        precheck_interleave::equiv::<_, Args>(a, b)
+    };
     // Exercise our list-stack for the precheck.
-    let precheck_on_liststack =
-        generic::precheck_interleave_equiv::<_, custom_table::Map, ListStack, ListStack>(a, b);
+    let precheck_on_liststack = {
+        struct Args;
+
+        impl precheck_interleave::Params<My> for Args
+        {
+            type InterleaveParams = InterleaveArgs;
+            type InterleaveRecurStack = ListStack;
+            type PrecheckRecurStack = ListStack;
+        }
+
+        precheck_interleave::equiv::<_, Args>(a, b)
+    };
 
     assert_eq!(precheck_on_callstack, precheck_on_liststack);
 

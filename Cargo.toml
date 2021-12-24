@@ -17,11 +17,16 @@ std = ["alloc"]
 alloc = []
 wyrng = ["wyhash"]
 
+[dependencies]
+cfg-if = "1"
 # Your choice of (pseudo)random-number generator.  If your project is already
 # using one, you could choose that same one, to have only a single (P)RNG
-# dependency.  It is easy to add one that was not already here, if you want, by
-# adding a module to `src/cycle_safe/modes/interleave/random/mod.rs`.
-[dependencies]
+# dependency.  It is easy to use one that was not already here, if you want,
+# either, by adding a module to `src/cycle_safe/modes/interleave/random/mod.rs`
+# (which allows using it as the default with the premade functionality), or by
+# directly giving your own type as argument for the generic parameter (e.g. see
+# `tests/custom.rs`).  Enabling multiple is allowed (but unusual) but only one
+# will be the default (based on hard-coded priority).
 fastrand = { version = "1", optional = true }
 # The below support `no_std` and are configured as such here.
 oorandom = { version = "11", optional = true }

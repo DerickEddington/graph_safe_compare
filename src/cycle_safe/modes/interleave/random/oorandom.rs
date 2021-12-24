@@ -6,10 +6,11 @@ use {
 };
 
 /// Wrap [`Rand32`] so that our traits can be `impl`ed on it.
-pub(in super::super) struct RandomNumberGenerator(Rand32);
+pub struct RandomNumberGenerator(Rand32);
 
 impl Default for RandomNumberGenerator
 {
+    #[inline]
     fn default() -> Self
     {
         /// The result of `Rand32::new(0).state()`.
@@ -22,6 +23,7 @@ impl Default for RandomNumberGenerator
 
 impl super::NumberGenerator for RandomNumberGenerator
 {
+    #[inline]
     fn rand_upto(
         &mut self,
         exclusive_end: NonZeroU16,
