@@ -6,15 +6,28 @@
 
 pub mod cases
 {
-    use std::mem::ManuallyDrop;
-
-    /// Because dropping deep graphs can cause stack overflows, disable dropping for select test
-    /// data so we know that any stack overflows that happen were not caused by dropping.  This
-    /// does leak the memory of these test data, which is acceptable.
-    #[derive(PartialEq, Eq, Debug)]
-    pub struct NoDrop<T>(pub ManuallyDrop<T>);
+    use crate::shapes::Pair;
 
     pub mod eq;
+
+    /// Prevent the dropping of deep graphs from causing stack overflows, for any [`Pair`] type.
+    pub struct Dropper<T: Pair>(pub T);
+
+    impl<T: Pair> Drop for Dropper<T>
+    {
+        fn drop(&mut self)
+        {
+            if let Some((a, b)) = Pair::take(&self.0) {
+                let mut recur_stack = vec![b, a];
+                while let Some(n) = recur_stack.pop() {
+                    if let Some((a, b)) = Pair::take(&n) {
+                        recur_stack.push(b);
+                        recur_stack.push(a);
+                    }
+                }
+            }
+        }
+    }
 }
 
 pub mod node_types
@@ -28,7 +41,42 @@ pub mod node_types
 
 pub mod shapes;
 
+pub mod sizes
+{
+    use std::{
+        env::{
+            self,
+            VarError,
+        },
+        str::FromStr,
+    };
 
-pub const LONG_LIST_TEST_LENGTH: u32 =
-    if cfg!(debug_assertions) { 1_000_000 } else { 10_000_000 };
-pub const DEGENERATE_TEST_DEPTH: u32 = if cfg!(debug_assertions) { 28 } else { 33 };
+    fn get_env_var<T: FromStr>(
+        name: &str,
+        default: T,
+    ) -> T
+    {
+        match env::var(name) {
+            Ok(s) => match s.parse() {
+                Ok(val) => val,
+                Err(_) => panic!(),
+            },
+            Err(VarError::NotPresent) => default,
+            Err(VarError::NotUnicode(_)) => panic!(),
+        }
+    }
+
+    pub fn long_list_length() -> u32
+    {
+        const DEFAULT: u32 = if cfg!(debug_assertions) { 1_000_000 } else { 2_000_000 };
+
+        get_env_var("MY_TEST_LONG_LIST_LENGTH", DEFAULT)
+    }
+
+    pub fn degenerate_depth() -> u32
+    {
+        const DEFAULT: u32 = if cfg!(debug_assertions) { 28 } else { 33 };
+
+        get_env_var("MY_TEST_DEGENERATE_DEPTH", DEFAULT)
+    }
+}

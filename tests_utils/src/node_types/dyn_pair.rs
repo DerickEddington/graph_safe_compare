@@ -162,6 +162,37 @@ impl Pair for DatumRef
             DowncastMutDatum::Datum2Char(mut rd2) => *rd2 = Datum2::Two(a, b),
         }
     }
+
+    fn take(&self) -> Option<(Self, Self)>
+    {
+        use std::mem::replace;
+
+        match self.downcast_mut() {
+            DowncastMutDatum::Datum1(mut rd1) => {
+                let val = replace(&mut *rd1, Datum1::Empty);
+                match val {
+                    Datum1::Empty => None,
+                    Datum1::Double(a, b) => Some((a, b)),
+                }
+            },
+            DowncastMutDatum::Datum2Int32(mut rd2) => {
+                let val = replace(&mut *rd2, Datum2::Value(0));
+                match val {
+                    Datum2::Value(_) => None,
+                    Datum2::Two(a, b) => Some((a, b)),
+                    Datum2::Four(_, _, _, _) => unreachable!(),
+                }
+            },
+            DowncastMutDatum::Datum2Char(mut rd2) => {
+                let val = replace(&mut *rd2, Datum2::Value('\0'));
+                match val {
+                    Datum2::Value(_) => None,
+                    Datum2::Two(a, b) => Some((a, b)),
+                    Datum2::Four(_, _, _, _) => unreachable!(),
+                }
+            },
+        }
+    }
 }
 
 

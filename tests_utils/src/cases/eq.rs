@@ -10,20 +10,25 @@ macro_rules! eq_case {
     ) => {
         let alloc1 = $alloc_trans($make_alloc($alloc_size));
         let make1 = $crate::shapes::PairChainMaker::new_with($shape_size, alloc1);
-        let ddag1 = make1.$shape_method();
+        let (head1, tail1) = make1.$shape_method();
 
         let alloc2 = $alloc_trans($make_alloc($alloc_size));
         let make2 = $crate::shapes::PairChainMaker::new_with($shape_size, alloc2);
-        let ddag2 = make2.$shape_method();
+        let (head2, tail2) = make2.$shape_method();
 
         // TODO: With assert_eq!, failures try to format the values, but there are some huge
         // values for which this tries to consume all memory just to format. Need the Debug impls
         // to limit how big of a formatted string they generate or something.
-        assert!(
-            $crate::cases::NoDrop(std::mem::ManuallyDrop::new($datum_trans(ddag1)))
-            ==
-            $crate::cases::NoDrop(std::mem::ManuallyDrop::new($datum_trans(ddag2)))
-        );
+
+        // The main purpose of this macro: test the `PartialEq` implementation:
+        assert!($datum_trans(head1.clone()) == $datum_trans(head2.clone()));
+
+        // Enable dropping to free the memory of shapes that were cyclic, by resetting their tails
+        // to no longer form cycles.
+        drop(($crate::shapes::Pair::take(&tail1), $crate::shapes::Pair::take(&tail2)));
+
+        // Now dropping them will free their memory.
+        drop(($crate::cases::Dropper(head1), $crate::cases::Dropper(head2)));
     };
 }
 
@@ -50,8 +55,8 @@ macro_rules! eq_shapes_tests
                 $crate::eq_case!(
                     $alloc_trans,
                     $make_alloc,
-                    $crate::DEGENERATE_TEST_DEPTH + 1,
-                    $crate::DEGENERATE_TEST_DEPTH,
+                    $crate::sizes::degenerate_depth() + 1,
+                    $crate::sizes::degenerate_depth(),
                     degenerate_dag,
                     $datum_trans
                 );
@@ -64,8 +69,8 @@ macro_rules! eq_shapes_tests
                 $crate::eq_case!(
                     $alloc_trans,
                     $make_alloc,
-                    $crate::DEGENERATE_TEST_DEPTH + 1,
-                    $crate::DEGENERATE_TEST_DEPTH,
+                    $crate::sizes::degenerate_depth() + 1,
+                    $crate::sizes::degenerate_depth(),
                     degenerate_cyclic,
                     $datum_trans
                 );
@@ -80,13 +85,13 @@ macro_rules! eq_shapes_tests
                 #[$maybe_ignore_stack_overflow]
                 fn dag_stack_overflow()
                 {
-                    const DEPTH: u32 = 1000 * $crate::DEGENERATE_TEST_DEPTH;
+                    let depth = 1000 * $crate::sizes::degenerate_depth();
 
                     $crate::eq_case!(
                         $alloc_trans,
                         $make_alloc,
-                        DEPTH + 1,
-                        DEPTH,
+                        depth + 1,
+                        depth,
                         degenerate_dag,
                         $datum_trans
                     );
@@ -97,13 +102,13 @@ macro_rules! eq_shapes_tests
                 #[$maybe_ignore_stack_overflow]
                 fn cyclic_stack_overflow()
                 {
-                    const DEPTH: u32 = 1000 * $crate::DEGENERATE_TEST_DEPTH;
+                    let depth = 1000 * $crate::sizes::degenerate_depth();
 
                     $crate::eq_case!(
                         $alloc_trans,
                         $make_alloc,
-                        DEPTH + 1,
-                        DEPTH,
+                        depth + 1,
+                        depth,
                         degenerate_cyclic,
                         $datum_trans
                     );
@@ -123,8 +128,8 @@ macro_rules! eq_shapes_tests
                 $crate::eq_case!(
                     $alloc_trans,
                     $make_alloc,
-                    2 * $crate::LONG_LIST_TEST_LENGTH + 1,
-                    $crate::LONG_LIST_TEST_LENGTH,
+                    2 * $crate::sizes::long_list_length() + 1,
+                    $crate::sizes::long_list_length(),
                     list,
                     $datum_trans
                 );
@@ -137,8 +142,8 @@ macro_rules! eq_shapes_tests
                 $crate::eq_case!(
                     $alloc_trans,
                     $make_alloc,
-                    2 * $crate::LONG_LIST_TEST_LENGTH + 1,
-                    $crate::LONG_LIST_TEST_LENGTH,
+                    2 * $crate::sizes::long_list_length() + 1,
+                    $crate::sizes::long_list_length(),
                     inverted_list,
                     $datum_trans
                 );
@@ -209,8 +214,8 @@ macro_rules! eq_variations_tests
                 $crate::eq_case!(
                     $alloc_trans,
                     $make_alloc,
-                    $crate::DEGENERATE_TEST_DEPTH + 1,
-                    $crate::DEGENERATE_TEST_DEPTH,
+                    $crate::sizes::degenerate_depth() + 1,
+                    $crate::sizes::degenerate_depth(),
                     degenerate_dag,
                     std::convert::identity
                 );
@@ -223,8 +228,8 @@ macro_rules! eq_variations_tests
                 $crate::eq_case!(
                     $alloc_trans,
                     $make_alloc,
-                    $crate::DEGENERATE_TEST_DEPTH + 1,
-                    $crate::DEGENERATE_TEST_DEPTH,
+                    $crate::sizes::degenerate_depth() + 1,
+                    $crate::sizes::degenerate_depth(),
                     degenerate_cyclic,
                     std::convert::identity
                 );

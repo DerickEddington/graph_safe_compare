@@ -36,6 +36,8 @@ pub trait Pair: Leaf
         b: Self,
     );
 
+    fn take(&self) -> Option<(Self, Self)>;
+
     fn new(
         a: Self,
         b: Self,
@@ -74,26 +76,26 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
         Self::new_with(depth, A::default())
     }
 
-    pub fn list(self) -> T
+    pub fn list(self) -> (T, T)
     {
-        self.chain(Self::leaf, Self::clone_head).0
+        self.chain(Self::leaf, Self::clone_head)
     }
 
-    pub fn inverted_list(self) -> T
+    pub fn inverted_list(self) -> (T, T)
     {
-        self.chain(Self::clone_head, Self::leaf).0
+        self.chain(Self::clone_head, Self::leaf)
     }
 
-    pub fn degenerate_dag(self) -> T
+    pub fn degenerate_dag(self) -> (T, T)
     {
-        self.degenerate().0
+        self.degenerate()
     }
 
-    pub fn degenerate_cyclic(self) -> T
+    pub fn degenerate_cyclic(self) -> (T, T)
     {
         let (head, tail) = self.degenerate();
         Pair::set(&tail, head.clone(), head.clone());
-        head
+        (head, tail)
     }
 
     fn degenerate(self) -> (T, T)

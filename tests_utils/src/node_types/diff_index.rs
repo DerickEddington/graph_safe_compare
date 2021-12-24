@@ -133,6 +133,15 @@ impl Pair for Datum
     {
         *self.deref_mut() = Inner::Pair(a, b);
     }
+
+    fn take(&self) -> Option<(Self, Self)>
+    {
+        let val = std::mem::replace(&mut *self.deref_mut(), Inner::Leaf);
+        match val {
+            Inner::Leaf => None,
+            Inner::Pair(a, b) => Some((a, b)),
+        }
+    }
 }
 
 

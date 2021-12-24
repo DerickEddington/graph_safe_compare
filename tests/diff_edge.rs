@@ -235,6 +235,27 @@ impl Pair for Kind
             _ => panic!("unsupported"),
         }
     }
+
+    fn take(&self) -> Option<(Self, Self)>
+    {
+        if let Kind::C(My3(d3)) = self {
+            let val = d3.0.replace(Datum4::End);
+            match val {
+                Datum4::Link(d1) => match &d1.child {
+                    Some(d2) => match &**d2 {
+                        Datum2::Double(a, b) =>
+                            Some((Kind::C(My3(Rc::clone(a))), Kind::C(My3(Rc::clone(b))))),
+                        Datum2::Triple(_, _, _) => unreachable!(),
+                    },
+                    None => unreachable!(),
+                },
+                Datum4::End => None,
+            }
+        }
+        else {
+            unreachable!()
+        }
+    }
 }
 
 pub struct KindAllocator;

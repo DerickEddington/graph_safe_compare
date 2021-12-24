@@ -38,6 +38,11 @@ impl Pair for Rc<Datum>
     {
         *self.0.borrow_mut() = Some((a, b));
     }
+
+    fn take(&self) -> Option<(Self, Self)>
+    {
+        self.0.replace(None)
+    }
 }
 
 

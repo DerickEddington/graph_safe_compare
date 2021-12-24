@@ -15,10 +15,10 @@ use {
 // is only used for demonstrating the limitations of the derived algorithm.  When
 // `cycle_deep_safe_compare` algorithms are tested against this type, their functions must be
 // called directly.
-#[derive(PartialEq, Eq, Clone, Default, Debug)]
+#[derive(PartialEq, Eq, Default, Debug)]
 pub struct Datum<'l>(pub RefCell<Inner<'l>>);
 
-#[derive(PartialEq, Eq, Clone, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum Inner<'l>
 {
     Leaf,
@@ -54,6 +54,12 @@ impl<'l> Pair for &'l Datum<'l>
     )
     {
         *self.0.borrow_mut() = Inner::Pair(a, b);
+    }
+
+    fn take(&self) -> Option<(Self, Self)>
+    {
+        let inner = self.0.replace(Inner::Leaf);
+        if let Inner::Pair(a, b) = inner { Some((a, b)) } else { None }
     }
 }
 
