@@ -5,6 +5,7 @@ authors = ["Derick Eddington"]
 license = "Unlicense"
 repository = "https://github.com/DerickEddington/cycle_deep_safe_compare"
 edition = "2021"
+rust-version = "1.57"
 
 [workspace]
 # The `test_no_std` package is independent, not a member of the workspace, so
