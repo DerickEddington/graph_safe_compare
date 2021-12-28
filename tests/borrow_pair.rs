@@ -1,3 +1,8 @@
+// For the expansion of `tests_utils::eq_variations_tests!` below.  It is ok for the `&Datum` to
+// be passed pointlessly to the `drop` in the general `tests_utils::eq_case!` macro, because the
+// `Datum` will instead be dropped along with their allocator.
+#![allow(clippy::drop_copy)]
+
 use {
     cycle_deep_safe_compare::Node,
     tests_utils::{

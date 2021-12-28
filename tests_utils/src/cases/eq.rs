@@ -21,13 +21,14 @@ macro_rules! eq_case {
         // to limit how big of a formatted string they generate or something.
 
         // The main purpose of this macro: test the `PartialEq` implementation:
-        assert!($datum_trans(head1.clone()) == $datum_trans(head2.clone()));
+        assert!($datum_trans(Clone::clone(&head1)) == $datum_trans(Clone::clone(&head2)));
 
         // Enable dropping to free the memory of shapes that were cyclic, by resetting their tails
         // to no longer form cycles.
         drop(($crate::shapes::Pair::take(&tail1), $crate::shapes::Pair::take(&tail2)));
 
-        // Now dropping them will free their memory.
+        // Now dropping them will free their memory (unless the type is `Copy`, in which case it
+        // is a `&` reference, and it is not a concern).
         drop(($crate::cases::Dropper(head1), $crate::cases::Dropper(head2)));
     };
 }
