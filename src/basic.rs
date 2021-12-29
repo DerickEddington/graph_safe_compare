@@ -182,6 +182,7 @@ pub mod modes
             impl Ticker for u32 {}
             impl Ticker for u64 {}
             impl Ticker for u128 {}
+            impl Ticker for usize {}
         }
 
         pub(in super::super) use sealed::Ticker;
