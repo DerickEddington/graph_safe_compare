@@ -1,33 +1,11 @@
-//! Things useful to both unit tests and integration tests.
-//! TODO: And benchmarks?
+//! Things useful to unit tests, integration tests, and benchmarks.
 
 #![forbid(unsafe_code)]
 
 
 pub mod cases
 {
-    use crate::shapes::Pair;
-
     pub mod eq;
-
-    /// Prevent the dropping of deep graphs from causing stack overflows, for any [`Pair`] type.
-    pub struct Dropper<T: Pair>(pub T);
-
-    impl<T: Pair> Drop for Dropper<T>
-    {
-        fn drop(&mut self)
-        {
-            if let Some((a, b)) = Pair::take(&self.0) {
-                let mut recur_stack = vec![b, a];
-                while let Some(n) = recur_stack.pop() {
-                    if let Some((a, b)) = Pair::take(&n) {
-                        recur_stack.push(b);
-                        recur_stack.push(a);
-                    }
-                }
-            }
-        }
-    }
 }
 
 pub mod node_types

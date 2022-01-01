@@ -51,6 +51,8 @@ pub mod recursion
     pub mod vecstack
     {
         //! Use [`Vec`] for the recursion stack, instead of the call-stack.
+        //!
+        //! The performance is competitive with, and sometimes better than, the call-stack.
 
         extern crate alloc;
 
@@ -81,7 +83,7 @@ pub mod recursion
             /// [`Params`] may be made with a more-appropriate value - either smaller or larger.
             /// Note that the default only affects the initial capacity of the underlying [`Vec`],
             /// and it will still grow as large as needed regardless by reallocating.
-            const INITIAL_CAPACITY: usize = 2_usize.pow(20);
+            const INITIAL_CAPACITY: usize = 2_usize.pow(17);
             /// Type of node that is saved on a stack.  Must be the same as used with the
             /// corresponding [`equiv::Params`].
             type Node: Node;

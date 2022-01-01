@@ -157,14 +157,17 @@ pub mod modes
 
         impl<P: Params> Interleave<P>
         {
-            const FAST_LIMIT_MAX_RANGE_END: NonZeroU16 =
+            /// Exclusive end of range, derived from
+            /// [`P::FAST_LIMIT_MAX`](Params::FAST_LIMIT_MAX).
+            pub const FAST_LIMIT_MAX_RANGE_END: NonZeroU16 =
                 match NonZeroU16::new(P::FAST_LIMIT_MAX + 1) {
                     Some(v) => v,
                     #[allow(clippy::panic)]
                     None => panic!(),
                 };
+            /// Negated [`P::SLOW_LIMIT`](Params::SLOW_LIMIT).
             #[allow(clippy::as_conversions)]
-            const SLOW_LIMIT_NEG: i32 = -(P::SLOW_LIMIT as i32);
+            pub const SLOW_LIMIT_NEG: i32 = -(P::SLOW_LIMIT as i32);
         }
 
         impl<P: Params> Default for Interleave<P>

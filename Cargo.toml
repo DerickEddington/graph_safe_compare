@@ -62,3 +62,8 @@ required-features = ["std"]
 [[test]]
 name = "rc_pair"
 required-features = ["std"]
+
+[profile.bench-max-optim]
+inherits = "bench"
+lto = true
+codegen-units = 1

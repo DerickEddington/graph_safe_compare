@@ -185,6 +185,7 @@ mod recursion
         ///
         /// When it is more efficient, the `self` value should be reset and then returned.  But a
         /// newly-created value may be returned if desired.
+        #[must_use]
         fn reset(self) -> Self;
     }
 }

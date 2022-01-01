@@ -91,10 +91,14 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
         self.degenerate()
     }
 
-    pub fn degenerate_cyclic(self) -> (T, T)
+    pub fn degenerate_cyclic(mut self) -> (T, T)
     {
+        let depth = self.depth;
+        self.depth = self.depth.saturating_sub(1);
         let (head, tail) = self.degenerate();
-        Pair::set(&tail, head.clone(), head.clone());
+        if depth >= 1 {
+            Pair::set(&tail, head.clone(), head.clone());
+        }
         (head, tail)
     }
 
@@ -124,5 +128,39 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
     fn clone_head(&mut self) -> T
     {
         self.head.clone()
+    }
+}
+
+
+/// Prevent the dropping of deep graphs from causing stack overflows, for any [`Pair`] type.
+struct Dropper<T: Pair>(T);
+
+impl<T: Pair> Drop for Dropper<T>
+{
+    fn drop(&mut self)
+    {
+        if let Some((a, b)) = Pair::take(&self.0) {
+            let mut recur_stack = vec![b, a];
+            while let Some(n) = recur_stack.pop() {
+                if let Some((a, b)) = Pair::take(&n) {
+                    recur_stack.push(b);
+                    recur_stack.push(a);
+                }
+            }
+        }
+    }
+}
+
+/// Prevent the dropping of cyclic and/or deep graphs from causing stack overflows, for any
+/// [`Pair`] type.
+pub fn cycle_deep_safe_drop<T: Pair, const N: usize>(graphs: [(T, T); N])
+{
+    for (head, tail) in graphs {
+        // Enable dropping to free the memory of shapes that were cyclic, by resetting their tails
+        // to no longer form cycles if they did.
+        drop(Pair::take(&tail));
+        // Now dropping will free the memory (unless the type is `Copy`, in which case it should
+        // be a `&` reference, and so is not a concern).
+        drop(Dropper(head));
     }
 }

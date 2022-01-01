@@ -146,6 +146,7 @@ pub trait Node
     /// Panics if the index is out of bounds.  But since the same implementor controls
     /// [`Self::amount_edges`], and when that is implemented correctly, as it must be, then such
     /// out-of-bounds panics are impossible, as used by the algorithm.
+    #[must_use]
     fn get_edge(
         &self,
         index: &Self::Index,
