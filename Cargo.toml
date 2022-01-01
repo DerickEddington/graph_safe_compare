@@ -13,7 +13,7 @@ rust-version = "1.57"
 exclude = ["test_no_std"]
 
 [features]
-default = ["std", "fastrand"]
+default = ["std", "wyrng"]
 std = ["alloc"]
 alloc = []
 wyrng = ["wyhash"]

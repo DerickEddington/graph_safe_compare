@@ -12,14 +12,14 @@ use {
 
 // The (P)RNG chosen as default, by priority.
 cfg_if! {
-    if #[cfg(feature = "fastrand")] {
-        pub use self::fastrand as default;
-    }
-    else if #[cfg(feature = "wyrng")] {
+    if #[cfg(feature = "wyrng")] {
         pub use self::wyrng as default;
     }
     else if #[cfg(feature = "oorandom")] {
         pub use self::oorandom as default;
+    }
+    else if #[cfg(feature = "fastrand")] {
+        pub use self::fastrand as default;
     }
 }
 
