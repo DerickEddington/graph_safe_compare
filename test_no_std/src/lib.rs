@@ -104,8 +104,8 @@ macro_rules! static_assert_dep_is_std {
                 },
                 deep_safe,
                 generic::equiv_classes::premade::{
-                    HashMap,
-                    Rc,
+                    hash_map::Table,
+                    rc::Rc,
                 },
                 robust,
             };
