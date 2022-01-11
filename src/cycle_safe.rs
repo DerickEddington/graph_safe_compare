@@ -20,9 +20,13 @@ mod premade
                 equiv_classes::premade::hash_map,
                 precheck_interleave,
             },
+            utils::IntoOk as _,
             Node,
         },
-        core::marker::PhantomData,
+        core::{
+            convert::Infallible,
+            marker::PhantomData,
+        },
     };
 
     struct Args<N>(PhantomData<N>);
@@ -44,17 +48,18 @@ mod premade
     pub fn equiv<N: Node>(
         a: &N,
         b: &N,
-    ) -> bool
+    ) -> N::Cmp
     {
         impl<N: Node> equiv::Params for Args<N>
         {
             type DescendMode = Interleave<Self>;
+            type Error = Infallible;
             type Node = N;
             type RecurStack = CallStack;
         }
 
         let mut e = Equiv::<Args<N>>::default();
-        e.is_equiv(a, b)
+        e.equiv(a, b).into_ok()
     }
 
 
@@ -64,16 +69,17 @@ mod premade
     pub fn precheck_equiv<N: Node>(
         a: &N,
         b: &N,
-    ) -> bool
+    ) -> N::Cmp
     {
         impl<N: Node> precheck_interleave::Params<N> for Args<N>
         {
+            type Error = Infallible;
             type InterleaveParams = Self;
             type InterleaveRecurStack = CallStack;
             type PrecheckRecurStack = CallStack;
         }
 
-        precheck_interleave::equiv::<N, Args<N>>(a, b)
+        precheck_interleave::equiv::<N, Args<N>>(a, b).into_ok()
     }
 }
 
@@ -103,7 +109,10 @@ pub mod modes
                 },
                 Node,
             },
-            core::num::NonZeroU16,
+            core::{
+                convert::Infallible,
+                num::NonZeroU16,
+            },
             random::NumberGenerator as _,
         };
 
@@ -189,7 +198,10 @@ pub mod modes
             E: equiv::Params<DescendMode = Self>,
             I: Params<Table = T>,
             T: Table<Node = E::Node>,
+            Infallible: Into<E::Error>,
         {
+            type Error = Infallible;
+
             /// Determine whether to use "slow" or "fast" phase, based on our limits.  When "slow"
             /// phase, if the nodes are already known to be equivalent then do not check their
             /// descendents.
@@ -198,10 +210,10 @@ pub mod modes
                 &mut self,
                 a: &E::Node,
                 b: &E::Node,
-            ) -> bool
+            ) -> Result<bool, Self::Error>
             {
                 // "fast" phase
-                if self.ticker >= 0 {
+                let r = if self.ticker >= 0 {
                     true
                 }
                 // "slow" limit reached, change to "fast" phase
@@ -225,15 +237,16 @@ pub mod modes
                 }
                 else {
                     true
-                }
+                };
+                Ok(r)
             }
 
             /// When [`Self::do_edges`] returns `true`, descend into edges without limit.
             #[inline]
-            fn do_recur(&mut self) -> bool
+            fn do_recur(&mut self) -> Result<bool, Self::Error>
             {
                 self.ticker = self.ticker.saturating_sub(1);
-                true
+                Ok(true)
             }
         }
     }

@@ -537,6 +537,7 @@ mod tests
         #[allow(clippy::unreachable)]
         impl Node for CharKeyed
         {
+            type Cmp = bool;
             type Id = char;
             type Index = u8;
 

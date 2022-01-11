@@ -2,6 +2,7 @@ mod common
 {
     pub mod rc_pair;
 }
+
 use {
     common::rc_pair::*,
     core::convert::identity,
@@ -105,33 +106,58 @@ mod custom_recur_stack
     extern crate alloc;
 
     use {
-        super::My,
+        super::{
+            other_recur_stack::OtherStack,
+            My,
+        },
         alloc::collections::LinkedList,
+        core::iter::Rev,
         cycle_deep_safe_compare::{
             basic::recursion::callstack::CallStack,
             generic::equiv::{
                 self,
-                Aborted,
                 Equiv,
                 RecurStack,
             },
+            utils::RangeIter,
+            Cmp,
+            Node,
         },
     };
 
     #[derive(Default)]
     pub struct ListStack(LinkedList<(My, My)>);
 
+    #[derive(Debug)]
+    pub struct ExhaustedError;
+
     impl<P> RecurStack<P> for ListStack
-    where P: equiv::Params<Node = My, RecurStack = Self>
+    where
+        P: equiv::Params<Node = My, RecurStack = Self>,
+        ExhaustedError: Into<P::Error>,
     {
+        type Error = ExhaustedError;
+        /// Recur on edges in left-to-right order, consistent with `CallStack` and `VecStack`.
+        type IndexIter = Rev<RangeIter<usize>>;
+
+        fn index_iter(end: <P::Node as Node>::Index) -> Self::IndexIter
+        {
+            RangeIter(0 .. end).rev()
+        }
+
         fn recur(
             it: &mut Equiv<P>,
             a: P::Node,
             b: P::Node,
-        ) -> Result<bool, Aborted>
+        ) -> Result<<P::Node as Node>::Cmp, Self::Error>
         {
-            it.recur_stack.0.push_front((a, b));
-            Ok(true)
+            if it.recur_stack.0.len() < 2_usize.pow(30) {
+                it.recur_stack.0.push_front((a, b));
+                Ok(Cmp::new_equiv())
+            }
+            else {
+                Err(ExhaustedError)
+            }
         }
 
         fn next(&mut self) -> Option<(P::Node, P::Node)>
@@ -151,6 +177,79 @@ mod custom_recur_stack
         fn from(_: CallStack) -> Self
         {
             Self::default()
+        }
+    }
+
+    impl From<OtherStack> for ListStack
+    {
+        fn from(_: OtherStack) -> Self
+        {
+            Self::default()
+        }
+    }
+}
+
+/// A different type, to test combining two custom `RecurStack` types.
+mod other_recur_stack
+{
+    use {
+        super::My,
+        cycle_deep_safe_compare::{
+            generic::equiv::{
+                self,
+                Equiv,
+                RecurStack,
+            },
+            utils::RangeIter,
+            Node,
+        },
+    };
+
+    #[derive(Default)]
+    pub struct OtherStack;
+
+    pub enum OtherStackError<R>
+    {
+        Novel,
+        Recur(R),
+    }
+
+    /// Like `CallStack` but with custom error.
+    impl<P> RecurStack<P> for OtherStack
+    where
+        P: equiv::Params<Node = My, RecurStack = Self>,
+        OtherStackError<P::Error>: Into<P::Error>,
+    {
+        type Error = OtherStackError<P::Error>;
+        type IndexIter = RangeIter<<P::Node as Node>::Index>;
+
+        fn index_iter(end: <P::Node as Node>::Index) -> Self::IndexIter
+        {
+            RangeIter(0 .. end)
+        }
+
+        fn recur(
+            it: &mut Equiv<P>,
+            a: P::Node,
+            b: P::Node,
+        ) -> Result<<P::Node as Node>::Cmp, Self::Error>
+        {
+            if true {
+                it.equiv_main(&a, &b).map_err(OtherStackError::Recur)
+            }
+            else {
+                Err(OtherStackError::Novel)
+            }
+        }
+
+        fn next(&mut self) -> Option<(P::Node, P::Node)>
+        {
+            None
+        }
+
+        fn reset(self) -> Self
+        {
+            self
         }
     }
 }
@@ -186,12 +285,22 @@ fn custom_equiv(
 ) -> bool
 {
     use {
-        custom_recur_stack::ListStack,
+        custom_recur_stack::{
+            ExhaustedError,
+            ListStack,
+        },
         custom_rng::PseudoPseudoRNG,
         cycle_deep_safe_compare::{
-            basic::recursion::callstack::CallStack,
             cycle_safe::modes::interleave,
-            generic::precheck_interleave,
+            generic::precheck_interleave::{
+                self,
+                InterleaveError,
+                PrecheckError,
+            },
+        },
+        other_recur_stack::{
+            OtherStack,
+            OtherStackError,
         },
     };
 
@@ -213,34 +322,79 @@ fn custom_equiv(
     // stack when the stack is already shallow, and use the list-stack for the interleave so great
     // depth is supported since an input could be very-deep.
     let precheck_on_callstack = {
-        struct Args;
-
-        impl precheck_interleave::Params<My> for Args
+        #[derive(Debug)]
+        enum ExhaustedOrOtherError
         {
-            type InterleaveParams = InterleaveArgs;
-            type InterleaveRecurStack = ListStack;
-            type PrecheckRecurStack = CallStack;
+            ExhaustedList,
+            OtherNovel,
         }
 
-        precheck_interleave::equiv::<_, Args>(a, b)
-    };
-    // Exercise our list-stack for the precheck.
-    let precheck_on_liststack = {
+        impl From<OtherStackError<Self>> for PrecheckError<ExhaustedOrOtherError>
+        {
+            fn from(e: OtherStackError<Self>) -> Self
+            {
+                match e {
+                    OtherStackError::Recur(e) => e,
+                    OtherStackError::Novel => Self::RecurError(ExhaustedOrOtherError::OtherNovel),
+                }
+            }
+        }
+
+        impl From<ExhaustedError> for InterleaveError<ExhaustedOrOtherError>
+        {
+            fn from(_: ExhaustedError) -> Self
+            {
+                InterleaveError(ExhaustedOrOtherError::ExhaustedList)
+            }
+        }
+
         struct Args;
 
         impl precheck_interleave::Params<My> for Args
         {
+            type Error = ExhaustedOrOtherError;
+            type InterleaveParams = InterleaveArgs;
+            type InterleaveRecurStack = ListStack;
+            type PrecheckRecurStack = OtherStack;
+        }
+
+        precheck_interleave::equiv::<_, Args>(a, b).unwrap()
+    };
+
+    // Exercise our list-stack for the precheck.
+    let precheck_on_liststack = {
+        impl From<ExhaustedError> for PrecheckError<ExhaustedError>
+        {
+            fn from(e: ExhaustedError) -> Self
+            {
+                PrecheckError::RecurError(e)
+            }
+        }
+
+        impl From<ExhaustedError> for InterleaveError<ExhaustedError>
+        {
+            fn from(e: ExhaustedError) -> Self
+            {
+                InterleaveError(e)
+            }
+        }
+
+        struct Args;
+
+        impl precheck_interleave::Params<My> for Args
+        {
+            type Error = ExhaustedError;
             type InterleaveParams = InterleaveArgs;
             type InterleaveRecurStack = ListStack;
             type PrecheckRecurStack = ListStack;
         }
 
-        precheck_interleave::equiv::<_, Args>(a, b)
+        precheck_interleave::equiv::<_, Args>(a, b).unwrap()
     };
 
     assert_eq!(precheck_on_callstack, precheck_on_liststack);
 
-    precheck_on_callstack
+    precheck_on_callstack == Ordering::Equal
 }
 
 mod eq_variation

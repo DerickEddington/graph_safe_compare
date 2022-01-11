@@ -11,7 +11,10 @@ use {
             RefCell,
             RefMut,
         },
-        ops::AddAssign,
+        ops::{
+            AddAssign,
+            SubAssign,
+        },
         rc::Rc,
     },
 };
@@ -109,6 +112,17 @@ impl AddAssign for Index
     )
     {
         *self = Index::from((*self as u8).saturating_add(rhs as u8));
+    }
+}
+
+impl SubAssign for Index
+{
+    fn sub_assign(
+        &mut self,
+        rhs: Self,
+    )
+    {
+        *self = Index::from((*self as u8).saturating_sub(rhs as u8));
     }
 }
 

@@ -14,6 +14,10 @@ mod premade
             use {
                 super::{
                     super::super::equiv,
+                    errors::{
+                        InterleaveError,
+                        PrecheckError,
+                    },
                     Params,
                 },
                 crate::{
@@ -29,6 +33,7 @@ mod premade
             impl<N: Node, P: Params<N>> equiv::Params for PrecheckArgs<N, P>
             {
                 type DescendMode = Limited<u16>;
+                type Error = PrecheckError<P::Error>;
                 type Node = N;
                 type RecurStack = P::PrecheckRecurStack;
             }
@@ -38,11 +43,71 @@ mod premade
             impl<N: Node, P: Params<N>> equiv::Params for InterleaveArgs<N, P>
             {
                 type DescendMode = Interleave<P::InterleaveParams>;
+                type Error = InterleaveError<P::Error>;
                 type Node = N;
                 type RecurStack = P::InterleaveRecurStack;
             }
         }
 
+        mod errors
+        {
+            use {
+                crate::basic::modes::limited::LimitReached,
+                core::convert::Infallible,
+            };
+
+            #[cfg(doc)]
+            use super::super::precheck_interleave;
+
+            /// Variants of errors that can occur while doing a precheck.
+            #[allow(clippy::exhaustive_enums)]
+            pub enum PrecheckError<E>
+            {
+                /// [`LimitReached`] occurred.  Abort the precheck.
+                LimitReached,
+                /// The [`precheck_interleave::Params::PrecheckRecurStack`] errored.
+                RecurError(E),
+            }
+
+            impl<E> From<LimitReached> for PrecheckError<E>
+            {
+                #[inline]
+                fn from(_: LimitReached) -> Self
+                {
+                    PrecheckError::LimitReached
+                }
+            }
+
+            impl<E> From<Infallible> for PrecheckError<E>
+            {
+                #[inline]
+                fn from(_: Infallible) -> Self
+                {
+                    #![allow(clippy::unreachable)] // Truly unreachable.
+                    unreachable!()
+                }
+            }
+
+            /// The [`precheck_interleave::Params::InterleaveRecurStack`] errored while doing an
+            /// interleave.
+            #[allow(clippy::exhaustive_structs)]
+            pub struct InterleaveError<E>(pub E);
+
+            impl<E> From<Infallible> for InterleaveError<E>
+            {
+                #[inline]
+                fn from(_: Infallible) -> Self
+                {
+                    #![allow(clippy::unreachable)] // Truly unreachable.
+                    unreachable!()
+                }
+            }
+        }
+
+        pub use errors::{
+            InterleaveError,
+            PrecheckError,
+        };
         use {
             super::super::equiv::{
                 Equiv,
@@ -53,7 +118,6 @@ mod premade
                 cycle_safe::modes::interleave,
                 Node,
             },
-            core::ops::ControlFlow,
             sealed::{
                 InterleaveArgs,
                 PrecheckArgs,
@@ -71,17 +135,25 @@ mod premade
             type InterleaveRecurStack: RecurStack<InterleaveArgs<N, Self>>;
             /// Type that `impl`s the arguments for the generic parameters for the interleave.
             type InterleaveParams: interleave::Params<Node = N>;
+            /// Type that represents the errors that can occur from [`Self::PrecheckRecurStack`]
+            /// and [`Self::InterleaveRecurStack`].
+            type Error;
         }
 
         /// Equivalence predicate that can handle cyclic graphs, but first tries the precheck that
         /// is faster for small acyclic graphs, and that requires choosing specific type arguments
         /// that determine the implementations of internal dynamic data structures.  Safe for
         /// very-deep graphs only when the interleave recursion-stack type is.
+        ///
+        /// # Errors
+        /// If the [`P::PrecheckRecurStack`](Params::PrecheckRecurStack) or
+        /// [`P::InterleaveRecurStack`](Params::InterleaveRecurStack) error, return an `Err` with
+        /// a [`P::Error`](Params::Error) that represents the error.
         #[inline]
         pub fn equiv<N, P>(
             a: &N,
             b: &N,
-        ) -> bool
+        ) -> Result<N::Cmp, P::Error>
         where
             N: Node,
             P: Params<N>,
@@ -91,11 +163,12 @@ mod premade
             let mut e =
                 Equiv::<PrecheckArgs<N, P>>::new(Limited(P::InterleaveParams::PRECHECK_LIMIT));
 
-            match e.precheck_equiv(a, b) {
-                ControlFlow::Break(result) => result,
-                ControlFlow::Continue(()) => {
+            match e.equiv(a, b) {
+                Ok(cmp) => Ok(cmp),
+                Err(PrecheckError::RecurError(e)) => Err(e),
+                Err(PrecheckError::LimitReached) => {
                     let mut e: Equiv<InterleaveArgs<N, P>> = e.into();
-                    e.is_equiv(a, b)
+                    e.equiv(a, b).map_err(|InterleaveError(error)| error)
                 },
             }
         }
@@ -110,6 +183,9 @@ mod modes
     /// Controls if node edges are descended into.
     pub trait DescendMode<P: Params>
     {
+        /// Type of error that can occur.
+        type Error: Into<P::Error>;
+
         /// Controls if all the descendents of a pair of nodes being compared should be
         /// immediately skipped.  Called before getting any edges.
         ///
@@ -120,55 +196,80 @@ mod modes
         /// already known to satisfy equivalence with their counterparts, and causes the
         /// comparison traversal to immediately continue on to the next non-descendent
         /// (i.e. sibling or ancestor) nodes.
+        ///
+        /// # Errors
+        /// Returning `Err` causes the invocation of the algorithm to abort early and immediately
+        /// return the converted error.
         fn do_edges(
             &mut self,
             a: &P::Node,
             b: &P::Node,
-        ) -> bool;
+        ) -> Result<bool, Self::Error>;
 
         /// Controls if individual descendent counterparts will be gotten and descended into via
-        /// recursion.  Called after getting and comparing any previous sibling descendents.
+        /// recursion.  Called repeatedly when getting and comparing descendents.
         ///
         /// Returning `true` causes the next counterparts to be gotten and recurred on to compare
         /// them.
         ///
-        /// Returning `false` causes the invocation of the algorithm to abort early and return
-        /// `Err(`[`Aborted`](super::equiv::Aborted)`)`.
-        fn do_recur(&mut self) -> bool;
+        /// Returning `false` causes them to be skipped, and assumes they are already known to
+        /// satisfy equivalence, and causes the comparison traversal to immediately continue on to
+        /// the next descendent nodes.
+        ///
+        /// # Errors
+        /// Returning `Err` causes the invocation of the algorithm to abort early and immediately
+        /// return the converted error.
+        fn do_recur(&mut self) -> Result<bool, Self::Error>;
     }
 }
 
 
 mod recursion
 {
-    use super::equiv::{
-        Aborted,
-        Equiv,
-        Params,
+    use {
+        super::equiv::{
+            Equiv,
+            Params,
+        },
+        crate::Node,
     };
 
     /// Abstraction of recursion continuations.
     pub trait RecurStack<P: Params>: Default
     {
+        /// Determines the order that edge indices are processed.
+        ///
+        /// Affects the order that edges are recurred on, which affects the consistency of
+        /// three-or-more-way comparison results when different [`RecurStack`] types are used.
+        type IndexIter: Iterator<Item = <P::Node as Node>::Index>;
+
+        /// Type of error that can occur.
+        type Error: Into<P::Error>;
+
+        /// Create a fresh [`Iterator`] that yields each [`Index`](Node::Index) in the range
+        /// `0.into() .. end`, once, in some desired order.
+        fn index_iter(end: <P::Node as Node>::Index) -> Self::IndexIter;
+
         /// Arrange for the given nodes to be recurred on, either immediately or later.
         ///
         /// The `it` parameter enables accessing the entire [`Equiv`] value.
         ///
         /// When recurred on immediately, the result must be that of comparing the given nodes
-        /// (`Ok`) or attempting to (`Err`).  When saved for later, the result must be `Ok(true)`
-        /// and [`Self::next`] must supply these nodes at some point, or the result must be
-        /// `Err(Aborted)` if the implementor wants to impose limiting.
+        /// (`Ok`) or attempting to (`Err`).  When saved for later, the result must be `Ok(cmp)`
+        /// where `cmp.is_equiv()` is true, and [`Self::next`] must supply these nodes at some
+        /// point, or the result must be `Err` if an error occurred.
         ///
-        /// Returning values other than `Ok(true)` causes the invocation of the algorithm to
-        /// immediately return the `Ok(false)` or `Err(Aborted)` value.
+        /// Returning `Ok(cmp)` where `cmp.is_equiv()` is false causes the invocation of the
+        /// algorithm to immediately return `cmp` that represents inequivalence.
         ///
         /// # Errors
-        /// If aborted early, returns `Err(Aborted)`.
+        /// Returning `Err` causes the invocation of the algorithm to abort early and immediately
+        /// return the converted error.
         fn recur(
             it: &mut Equiv<P>,
             a: P::Node,
             b: P::Node,
-        ) -> Result<bool, Aborted>;
+        ) -> Result<<P::Node as Node>::Cmp, Self::Error>;
 
         /// Supply the next counterpart nodes for the algorithm to compare, if any were saved for
         /// later by [`Self::recur`].
@@ -195,7 +296,10 @@ mod recursion
 pub mod equiv
 {
     use {
-        crate::Node,
+        crate::{
+            Cmp,
+            Node,
+        },
         core::borrow::Borrow,
     };
 
@@ -213,6 +317,9 @@ pub mod equiv
         type DescendMode: DescendMode<Self>;
         /// Type that provides recursion continuations.
         type RecurStack: RecurStack<Self>;
+        /// Type that represents the errors that can occur from [`Self::DescendMode`] and
+        /// [`Self::RecurStack`].
+        type Error;
     }
 
     /// The state for an invocation of a variation of the algorithm.
@@ -288,51 +395,26 @@ pub mod equiv
     }
 
 
-    /// Indicates that the algorithm aborted early without determining the result.
-    ///
-    /// This occurs when the [`DescendMode::do_recur`] returns `false` or when the
-    /// [`RecurStack::recur`] returns `Err(Aborted)`.
-    ///
-    /// Used as the value in a `Result::Err`.
-    #[non_exhaustive]
-    pub struct Aborted;
-
-
     /// The primary logic of the algorithm.
     ///
     /// This generic design works with the [`Node`], [`DescendMode`], and [`RecurStack`] traits to
     /// enable variations.
     impl<P: Params> Equiv<P>
     {
-        /// Convenience that calls [`Self::equiv`] and returns `true` if the given nodes are
-        /// equivalent, `false` if not or if the algorithm aborted early (which can be impossible
-        /// for some variations).
-        #[inline]
-        pub fn is_equiv<T: Borrow<P::Node>>(
-            &mut self,
-            ai: T,
-            bi: T,
-        ) -> bool
-        {
-            matches!(self.equiv(ai, bi), Ok(true))
-        }
-
         /// The entry-point of the algorithm.
         ///
-        /// Returns `Ok(true)` if the given nodes are equivalent, according to the trait
-        /// implementations that define the variation of the logic.
-        ///
-        /// Returns `Ok(false)` if the given nodes are unequivalent.
+        /// Returns `Ok` with a value that represents the result of comparison, according to the
+        /// trait implementations that define the variation of the logic.
         ///
         /// # Errors
-        /// Returns `Err(Aborted)` if the [`DescendMode::do_recur`] or the [`RecurStack::recur`]
-        /// indicates to abort early.
+        /// If a [`DescendMode`] or [`RecurStack`] method gives an error, returns that error
+        /// converted.
         #[inline]
         pub fn equiv<T: Borrow<P::Node>>(
             &mut self,
             ai: T,
             bi: T,
-        ) -> Result<bool, Aborted>
+        ) -> Result<<P::Node as Node>::Cmp, P::Error>
         {
             let (mut ar, mut br) = (ai.borrow(), bi.borrow());
             let (mut ao, mut bo);
@@ -344,18 +426,16 @@ pub mod equiv
             // `RecurStack::next` always returns `None` and so this loop should be optimized away.
             loop {
                 match self.equiv_main(ar, br) {
-                    Ok(true) => (),
+                    Ok(cmp) if cmp.is_equiv() => match self.recur_stack.next() {
+                        Some((an, bn)) => {
+                            ao = an;
+                            bo = bn;
+                            ar = &ao;
+                            br = &bo;
+                        },
+                        None => return Ok(cmp),
+                    },
                     result => return result,
-                }
-
-                if let Some((an, bn)) = self.recur_stack.next() {
-                    ao = an;
-                    bo = bn;
-                    ar = &ao;
-                    br = &bo;
-                }
-                else {
-                    break Ok(true);
                 }
             }
         }
@@ -374,36 +454,47 @@ pub mod equiv
             &mut self,
             a: &P::Node,
             b: &P::Node,
-        ) -> Result<bool, Aborted>
+        ) -> Result<<P::Node as Node>::Cmp, P::Error>
         {
+            macro_rules! try_ret {
+                ($result:path, $conv:path, $e:expr) => {
+                    match $e {
+                        Ok(v) => v,
+                        Err(e) => return $result($conv(e)),
+                    }
+                };
+            }
+            macro_rules! try_cmp {
+                ($e:expr) => {
+                    try_ret!(Ok, core::convert::identity, $e)
+                };
+            }
+            macro_rules! try_into {
+                ($e:expr) => {
+                    try_ret!(Err, Into::into, $e)
+                };
+            }
+
             // For trait method implementations that always return the same constant, dead
             // branches should be eliminated by the optimizer.  For the other methods, inlining
             // should be doable by the optimizer.
 
-            if a.id() == b.id() {
-            }
-            else if let Some(amount_edges) = a.equiv_modulo_descendents_then_amount_edges(b) {
-                let mut i = 0.into();
-                if i < amount_edges && self.descend_mode.do_edges(a, b) {
-                    while i < amount_edges {
-                        if self.descend_mode.do_recur() {
+            if a.id() != b.id() {
+                let amount_edges = try_cmp!(a.equiv_modulo_descendents_then_amount_edges(b));
+                if amount_edges > 0.into() && try_into!(self.descend_mode.do_edges(a, b)) {
+                    for i in P::RecurStack::index_iter(amount_edges) {
+                        if try_into!(self.descend_mode.do_recur()) {
                             let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
-                            match P::RecurStack::recur(self, ae, be) {
-                                Ok(true) => (),
-                                result => return result,
+                            let cmp = try_into!(P::RecurStack::recur(self, ae, be));
+                            if !cmp.is_equiv() {
+                                return Ok(cmp);
                             }
                         }
-                        else {
-                            return Err(Aborted);
-                        }
-                        i += 1.into();
                     }
                 }
             }
-            else {
-                return Ok(false);
-            }
-            Ok(true)
+
+            Ok(Cmp::new_equiv())
         }
     }
 }

@@ -152,6 +152,7 @@ macro_rules! eq_shapes_tests
 macro_rules! eq_variation_mod_body {
     ($algo_func:path, $my_type:ty, $datum_type:ty, $alloc_trans:tt, $make_alloc:expr) => {
         use {
+            cycle_deep_safe_compare::Cmp as _,
             super::*,
             std::marker::PhantomData,
         };
@@ -174,7 +175,8 @@ macro_rules! eq_variation_mod_body {
                 other: &Self,
             ) -> bool
             {
-                $algo_func(&self.0, &other.0)
+                let cmp = $algo_func(&self.0, &other.0);
+                cmp.is_equiv()
             }
         }
 
@@ -251,8 +253,11 @@ macro_rules! eq_variations_tests
                 b: &N,
             ) -> bool
             {
+                use cycle_deep_safe_compare::Cmp as _;
+
                 const LIMIT: u32 = 50;
-                matches!(cycle_deep_safe_compare::basic::limited_equiv(LIMIT, a, b), Ok(true))
+                matches!(cycle_deep_safe_compare::basic::limited_equiv(LIMIT, a, b),
+                         Ok(cmp) if cmp.is_equiv())
             }
 
             mod limited
@@ -362,14 +367,20 @@ macro_rules! eq_variations_tests
                             precheck_interleave,
                             equiv_classes::premade::hash_map,
                         },
+                        Cmp as _,
+                        utils::IntoOk as _,
                     },
-                    core::marker::PhantomData,
+                    core::{
+                        convert::Infallible,
+                        marker::PhantomData,
+                    },
                 };
 
                 struct Args<N>(PhantomData<N>);
 
                 impl<N: Node> precheck_interleave::Params<N> for Args<N>
                 {
+                    type Error = Infallible;
                     type PrecheckRecurStack = CallStack;
                     type InterleaveRecurStack = VecStack<Self>;
                     type InterleaveParams = Self;
@@ -401,7 +412,8 @@ macro_rules! eq_variations_tests
                     type RNG = default::RandomNumberGenerator;
                 }
 
-                precheck_interleave::equiv::<_, Args<_>>(a, b)
+                let cmp = precheck_interleave::equiv::<_, Args<_>>(a, b).into_ok();
+                cmp.is_equiv()
             }
 
             mod precheck_interleave_callstack_vecstack

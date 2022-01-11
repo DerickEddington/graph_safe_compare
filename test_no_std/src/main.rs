@@ -13,6 +13,7 @@ test_no_std::static_assert_dep_is_std!();
 
 
 use {
+    core::cmp::Ordering,
     cycle_deep_safe_compare::{
         basic::equiv,
         Node,
@@ -28,6 +29,7 @@ pub struct It(i32);
 
 impl Node for It
 {
+    type Cmp = Ordering;
     type Id = *const Self;
     type Index = u8;
 
@@ -52,9 +54,9 @@ impl Node for It
     fn equiv_modulo_edges(
         &self,
         other: &Self,
-    ) -> bool
+    ) -> Ordering
     {
-        self.0 == other.0
+        self.0.cmp(&other.0)
     }
 }
 
@@ -70,7 +72,7 @@ impl PartialEq for It
         other: &Self,
     ) -> bool
     {
-        equiv(self, other)
+        equiv(self, other).is_eq()
     }
 }
 impl Eq for It {}

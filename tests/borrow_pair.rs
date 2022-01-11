@@ -21,6 +21,7 @@ struct My<'l>(&'l Datum<'l>);
 
 impl<'l> Node for My<'l>
 {
+    type Cmp = bool;
     type Id = *const Datum<'l>;
     type Index = u32;
 

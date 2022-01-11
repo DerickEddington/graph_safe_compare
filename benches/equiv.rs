@@ -108,24 +108,43 @@ mod inputs
 }
 
 
-trait IntoBool
+mod into_bool
 {
-    fn into_bool(self) -> bool;
-}
-impl IntoBool for bool
-{
-    fn into_bool(self) -> bool
+    use {
+        core::cmp::Ordering,
+        cycle_deep_safe_compare::Cmp,
+    };
+
+    pub trait IntoBool
     {
-        self
+        fn into_bool(self) -> bool;
+    }
+
+    impl IntoBool for bool
+    {
+        fn into_bool(self) -> bool
+        {
+            self
+        }
+    }
+
+    impl IntoBool for Ordering
+    {
+        fn into_bool(self) -> bool
+        {
+            self.is_eq()
+        }
+    }
+
+    impl<T: Cmp, E> IntoBool for Result<T, E>
+    {
+        fn into_bool(self) -> bool
+        {
+            matches!(self, Ok(cmp) if cmp.is_equiv())
+        }
     }
 }
-impl<E> IntoBool for Result<bool, E>
-{
-    fn into_bool(self) -> bool
-    {
-        matches!(self, Ok(true))
-    }
-}
+
 
 macro_rules! variation_benches {
     ($name:ident, [$($func:ident $(($($var:ident = $arg:expr),+))?),+]) => {
@@ -175,6 +194,7 @@ macro_rules! variation {
                                 $shape::new_inputs,
                                 Input,
                             },
+                            into_bool::IntoBool,
                         },
                         test::Bencher,
                         tests_utils::shapes::cycle_deep_safe_drop,

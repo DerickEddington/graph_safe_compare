@@ -10,11 +10,15 @@ use {
             precheck_interleave,
         },
         robust,
+        utils::IntoOk as _,
         Node,
     },
     std::{
         cell::RefCell,
-        convert::identity,
+        convert::{
+            identity,
+            Infallible,
+        },
     },
     tests_utils::{
         node_types::diff_index::{
@@ -44,6 +48,7 @@ impl PartialEq for My
 
             impl precheck_interleave::Params<My> for Args
             {
+                type Error = Infallible;
                 type InterleaveParams = Self;
                 type InterleaveRecurStack = CallStack;
                 type PrecheckRecurStack = CallStack;
@@ -61,7 +66,7 @@ impl PartialEq for My
                 type Table = hash_map::Table<Self>;
             }
 
-            precheck_interleave::equiv::<_, Args>(self, other)
+            precheck_interleave::equiv::<_, Args>(self, other).into_ok()
         };
         let robust = robust::precheck_equiv(self, other);
         assert_eq!(callstack, robust);
@@ -71,6 +76,7 @@ impl PartialEq for My
 
 impl Node for My
 {
+    type Cmp = bool;
     type Id = (Index, *const [RefCell<Inner>]);
     type Index = Index;
 

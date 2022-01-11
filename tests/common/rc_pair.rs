@@ -1,6 +1,9 @@
 pub use {
     cycle_deep_safe_compare::Node,
-    std::rc::Rc,
+    std::{
+        cmp::Ordering,
+        rc::Rc,
+    },
     tests_utils::{
         node_types::rc_pair::{
             Datum,
@@ -16,6 +19,7 @@ pub struct My(pub Rc<Datum>);
 
 impl Node for My
 {
+    type Cmp = Ordering;
     type Id = *const Datum;
     type Index = usize;
 
@@ -47,8 +51,8 @@ impl Node for My
     fn equiv_modulo_edges(
         &self,
         _other: &Self,
-    ) -> bool
+    ) -> Self::Cmp
     {
-        true
+        Ordering::Equal
     }
 }

@@ -4,7 +4,7 @@
 
 Executed on my Ryzen 7 5800H CPU in "maximum performance" mode (45 W, low-power states disabled,
 fans on max, but GHz can still be varied a little), on my 3200 MHz DDR4 RAM (2x32 G, dual
-channel), with very little other load, on NixOS 21.11 with its 5.15.11 kernel, compiled by rustc
+channel), with very little other load, on NixOS 21.11 with its 5.15.12 kernel, compiled by rustc
 1.59.0-nightly, with LTO, with each benchmark running serially (one at a time) using only 1 core
 (leaving 7 other cores for the other tiny load).
 
@@ -13,77 +13,77 @@ The following results are interpreted farther [below](#interpretation).
 ```
 $ cargo +nightly bench --profile bench-max-optim
 
-     Running unittests (target/bench-max-optim/deps/equiv-3d2a7a15b064f126)
+     Running unittests (target/bench-max-optim/deps/equiv-ed6e12b16ac8ffe5)
 
 running 66 tests
-test basic::degenerate_dag::equiv                        ... bench:   3,709,111 ns/iter (+/- 136,433)
-test basic::degenerate_dag::limited_equiv                ... bench:   3,937,272 ns/iter (+/- 152,814)
-test basic::inverted_list::equiv                         ... bench:     179,331 ns/iter (+/- 37,946)
-test basic::inverted_list::limited_equiv                 ... bench:     176,260 ns/iter (+/- 27,371)
-test basic::list::equiv                                  ... bench:     152,842 ns/iter (+/- 15,247)
-test basic::list::limited_equiv                          ... bench:     169,783 ns/iter (+/- 21,178)
-test basic::short_degenerate_dag::equiv                  ... bench:       1,818 ns/iter (+/- 64)
-test basic::short_degenerate_dag::limited_equiv          ... bench:       1,970 ns/iter (+/- 68)
-test basic::short_inverted_list::equiv                   ... bench:       1,681 ns/iter (+/- 53)
-test basic::short_inverted_list::limited_equiv           ... bench:       1,898 ns/iter (+/- 49)
-test basic::short_list::equiv                            ... bench:       1,782 ns/iter (+/- 42)
-test basic::short_list::limited_equiv                    ... bench:       1,700 ns/iter (+/- 67)
-test cycle_safe::degenerate_cyclic::equiv                ... bench:       3,090 ns/iter (+/- 58)
-test cycle_safe::degenerate_cyclic::precheck_equiv       ... bench:       7,013 ns/iter (+/- 262)
-test cycle_safe::degenerate_dag::equiv                   ... bench:       2,958 ns/iter (+/- 117)
-test cycle_safe::degenerate_dag::precheck_equiv          ... bench:       6,040 ns/iter (+/- 228)
-test cycle_safe::inverted_list::equiv                    ... bench:     271,584 ns/iter (+/- 25,081)
-test cycle_safe::inverted_list::precheck_equiv           ... bench:     267,445 ns/iter (+/- 21,876)
-test cycle_safe::list::equiv                             ... bench:     248,335 ns/iter (+/- 27,933)
-test cycle_safe::list::precheck_equiv                    ... bench:     258,195 ns/iter (+/- 37,146)
-test cycle_safe::short_degenerate_cyclic::equiv          ... bench:       1,348 ns/iter (+/- 54)
-test cycle_safe::short_degenerate_cyclic::precheck_equiv ... bench:       5,649 ns/iter (+/- 164)
-test cycle_safe::short_degenerate_dag::equiv             ... bench:       1,278 ns/iter (+/- 20)
-test cycle_safe::short_degenerate_dag::precheck_equiv    ... bench:       1,914 ns/iter (+/- 100)
-test cycle_safe::short_inverted_list::equiv              ... bench:       6,882 ns/iter (+/- 275)
-test cycle_safe::short_inverted_list::precheck_equiv     ... bench:       1,862 ns/iter (+/- 89)
-test cycle_safe::short_list::equiv                       ... bench:       4,620 ns/iter (+/- 130)
-test cycle_safe::short_list::precheck_equiv              ... bench:       1,750 ns/iter (+/- 75)
-test deep_safe::degenerate_dag::equiv                    ... bench:   3,395,443 ns/iter (+/- 153,561)
-test deep_safe::inverted_list::equiv                     ... bench:     111,597 ns/iter (+/- 11,637)
-test deep_safe::list::equiv                              ... bench:     112,183 ns/iter (+/- 7,879)
-test deep_safe::long_inverted_list::equiv                ... bench:   4,403,571 ns/iter (+/- 629,291)
-test deep_safe::long_list::equiv                         ... bench:   6,693,426 ns/iter (+/- 422,358)
-test deep_safe::short_degenerate_dag::equiv              ... bench:       1,727 ns/iter (+/- 76)
-test deep_safe::short_inverted_list::equiv               ... bench:       1,298 ns/iter (+/- 54)
-test deep_safe::short_list::equiv                        ... bench:       1,303 ns/iter (+/- 70)
-test derived_eq::degenerate_dag::eq                      ... bench:   1,158,603 ns/iter (+/- 49,270)
-test derived_eq::inverted_list::eq                       ... bench:      75,044 ns/iter (+/- 15,041)
-test derived_eq::list::eq                                ... bench:      70,195 ns/iter (+/- 11,495)
-test derived_eq::short_degenerate_dag::eq                ... bench:         544 ns/iter (+/- 24)
-test derived_eq::short_inverted_list::eq                 ... bench:         607 ns/iter (+/- 75)
-test derived_eq::short_list::eq                          ... bench:         422 ns/iter (+/- 20)
-test robust::degenerate_cyclic::equiv                    ... bench:       3,011 ns/iter (+/- 110)
-test robust::degenerate_cyclic::precheck_equiv           ... bench:       5,676 ns/iter (+/- 201)
-test robust::degenerate_dag::equiv                       ... bench:       2,952 ns/iter (+/- 76)
-test robust::degenerate_dag::precheck_equiv              ... bench:       5,894 ns/iter (+/- 227)
-test robust::inverted_list::equiv                        ... bench:     187,335 ns/iter (+/- 22,390)
-test robust::inverted_list::precheck_equiv               ... bench:     185,101 ns/iter (+/- 27,250)
-test robust::list::equiv                                 ... bench:     193,172 ns/iter (+/- 29,298)
-test robust::list::precheck_equiv                        ... bench:     194,018 ns/iter (+/- 15,518)
-test robust::long_degenerate_cyclic::equiv               ... bench: 115,256,800 ns/iter (+/- 11,149,944)
-test robust::long_degenerate_cyclic::precheck_equiv      ... bench: 113,632,758 ns/iter (+/- 11,256,653)
-test robust::long_degenerate_dag::equiv                  ... bench: 114,925,357 ns/iter (+/- 10,666,182)
-test robust::long_degenerate_dag::precheck_equiv         ... bench: 113,278,800 ns/iter (+/- 9,800,128)
-test robust::long_inverted_list::equiv                   ... bench:   8,724,244 ns/iter (+/- 1,839,951)
-test robust::long_inverted_list::precheck_equiv          ... bench:   8,907,767 ns/iter (+/- 1,634,104)
-test robust::long_list::equiv                            ... bench:  12,276,208 ns/iter (+/- 1,079,487)
-test robust::long_list::precheck_equiv                   ... bench:  14,883,785 ns/iter (+/- 2,294,494)
-test robust::short_degenerate_cyclic::equiv              ... bench:       1,378 ns/iter (+/- 131)
-test robust::short_degenerate_cyclic::precheck_equiv     ... bench:       4,055 ns/iter (+/- 160)
-test robust::short_degenerate_dag::equiv                 ... bench:       1,339 ns/iter (+/- 48)
-test robust::short_degenerate_dag::precheck_equiv        ... bench:       1,895 ns/iter (+/- 107)
-test robust::short_inverted_list::equiv                  ... bench:       4,389 ns/iter (+/- 217)
-test robust::short_inverted_list::precheck_equiv         ... bench:       1,473 ns/iter (+/- 73)
-test robust::short_list::equiv                           ... bench:       4,424 ns/iter (+/- 295)
-test robust::short_list::precheck_equiv                  ... bench:       1,563 ns/iter (+/- 78)
+test basic::degenerate_dag::equiv                        ... bench:   3,847,750 ns/iter (+/- 70,649)
+test basic::degenerate_dag::limited_equiv                ... bench:   3,974,424 ns/iter (+/- 68,153)
+test basic::inverted_list::equiv                         ... bench:     175,439 ns/iter (+/- 12,300)
+test basic::inverted_list::limited_equiv                 ... bench:     188,871 ns/iter (+/- 8,864)
+test basic::list::equiv                                  ... bench:     161,609 ns/iter (+/- 36,843)
+test basic::list::limited_equiv                          ... bench:     166,787 ns/iter (+/- 24,798)
+test basic::short_degenerate_dag::equiv                  ... bench:       1,942 ns/iter (+/- 82)
+test basic::short_degenerate_dag::limited_equiv          ... bench:       2,033 ns/iter (+/- 82)
+test basic::short_inverted_list::equiv                   ... bench:       1,745 ns/iter (+/- 69)
+test basic::short_inverted_list::limited_equiv           ... bench:       1,927 ns/iter (+/- 69)
+test basic::short_list::equiv                            ... bench:       1,723 ns/iter (+/- 80)
+test basic::short_list::limited_equiv                    ... bench:       1,807 ns/iter (+/- 72)
+test cycle_safe::degenerate_cyclic::equiv                ... bench:       2,988 ns/iter (+/- 53)
+test cycle_safe::degenerate_cyclic::precheck_equiv       ... bench:       6,820 ns/iter (+/- 297)
+test cycle_safe::degenerate_dag::equiv                   ... bench:       2,931 ns/iter (+/- 86)
+test cycle_safe::degenerate_dag::precheck_equiv          ... bench:       6,152 ns/iter (+/- 419)
+test cycle_safe::inverted_list::equiv                    ... bench:     238,830 ns/iter (+/- 40,060)
+test cycle_safe::inverted_list::precheck_equiv           ... bench:     242,658 ns/iter (+/- 40,944)
+test cycle_safe::list::equiv                             ... bench:     246,091 ns/iter (+/- 41,619)
+test cycle_safe::list::precheck_equiv                    ... bench:     237,945 ns/iter (+/- 63,633)
+test cycle_safe::short_degenerate_cyclic::equiv          ... bench:       1,323 ns/iter (+/- 40)
+test cycle_safe::short_degenerate_cyclic::precheck_equiv ... bench:       5,109 ns/iter (+/- 195)
+test cycle_safe::short_degenerate_dag::equiv             ... bench:       1,263 ns/iter (+/- 33)
+test cycle_safe::short_degenerate_dag::precheck_equiv    ... bench:       1,955 ns/iter (+/- 35)
+test cycle_safe::short_inverted_list::equiv              ... bench:       6,635 ns/iter (+/- 241)
+test cycle_safe::short_inverted_list::precheck_equiv     ... bench:       1,820 ns/iter (+/- 57)
+test cycle_safe::short_list::equiv                       ... bench:       4,459 ns/iter (+/- 143)
+test cycle_safe::short_list::precheck_equiv              ... bench:       1,758 ns/iter (+/- 27)
+test deep_safe::degenerate_dag::equiv                    ... bench:   2,822,701 ns/iter (+/- 140,410)
+test deep_safe::inverted_list::equiv                     ... bench:      91,485 ns/iter (+/- 24,764)
+test deep_safe::list::equiv                              ... bench:      88,588 ns/iter (+/- 7,122)
+test deep_safe::long_inverted_list::equiv                ... bench:   6,459,989 ns/iter (+/- 290,648)
+test deep_safe::long_list::equiv                         ... bench:   3,812,624 ns/iter (+/- 395,841)
+test deep_safe::short_degenerate_dag::equiv              ... bench:       1,371 ns/iter (+/- 57)
+test deep_safe::short_inverted_list::equiv               ... bench:       1,076 ns/iter (+/- 39)
+test deep_safe::short_list::equiv                        ... bench:       1,064 ns/iter (+/- 46)
+test derived_eq::degenerate_dag::eq                      ... bench:   1,178,313 ns/iter (+/- 75,761)
+test derived_eq::inverted_list::eq                       ... bench:      88,380 ns/iter (+/- 29,681)
+test derived_eq::list::eq                                ... bench:      74,408 ns/iter (+/- 7,253)
+test derived_eq::short_degenerate_dag::eq                ... bench:         564 ns/iter (+/- 11)
+test derived_eq::short_inverted_list::eq                 ... bench:         752 ns/iter (+/- 114)
+test derived_eq::short_list::eq                          ... bench:         448 ns/iter (+/- 11)
+test robust::degenerate_cyclic::equiv                    ... bench:       3,055 ns/iter (+/- 156)
+test robust::degenerate_cyclic::precheck_equiv           ... bench:       5,099 ns/iter (+/- 38)
+test robust::degenerate_dag::equiv                       ... bench:       2,995 ns/iter (+/- 49)
+test robust::degenerate_dag::precheck_equiv              ... bench:       5,287 ns/iter (+/- 145)
+test robust::inverted_list::equiv                        ... bench:     161,694 ns/iter (+/- 9,852)
+test robust::inverted_list::precheck_equiv               ... bench:     163,608 ns/iter (+/- 20,359)
+test robust::list::equiv                                 ... bench:     156,986 ns/iter (+/- 13,962)
+test robust::list::precheck_equiv                        ... bench:     173,661 ns/iter (+/- 22,156)
+test robust::long_degenerate_cyclic::equiv               ... bench: 112,770,332 ns/iter (+/- 6,191,108)
+test robust::long_degenerate_cyclic::precheck_equiv      ... bench: 109,561,112 ns/iter (+/- 6,810,804)
+test robust::long_degenerate_dag::equiv                  ... bench: 112,442,771 ns/iter (+/- 6,530,739)
+test robust::long_degenerate_dag::precheck_equiv         ... bench: 108,724,493 ns/iter (+/- 5,582,998)
+test robust::long_inverted_list::equiv                   ... bench:  12,539,428 ns/iter (+/- 1,318,153)
+test robust::long_inverted_list::precheck_equiv          ... bench:  11,193,337 ns/iter (+/- 972,868)
+test robust::long_list::equiv                            ... bench:   8,377,566 ns/iter (+/- 628,553)
+test robust::long_list::precheck_equiv                   ... bench:  12,078,208 ns/iter (+/- 996,303)
+test robust::short_degenerate_cyclic::equiv              ... bench:       1,371 ns/iter (+/- 32)
+test robust::short_degenerate_cyclic::precheck_equiv     ... bench:       3,463 ns/iter (+/- 147)
+test robust::short_degenerate_dag::equiv                 ... bench:       1,303 ns/iter (+/- 35)
+test robust::short_degenerate_dag::precheck_equiv        ... bench:       1,514 ns/iter (+/- 22)
+test robust::short_inverted_list::equiv                  ... bench:       3,704 ns/iter (+/- 208)
+test robust::short_inverted_list::precheck_equiv         ... bench:       1,205 ns/iter (+/- 50)
+test robust::short_list::equiv                           ... bench:       3,647 ns/iter (+/- 283)
+test robust::short_list::precheck_equiv                  ... bench:       1,157 ns/iter (+/- 29)
 
-test result: ok. 0 passed; 0 failed; 0 ignored; 66 measured; 0 filtered out; finished in 319.48s
+test result: ok. 0 passed; 0 failed; 0 ignored; 66 measured; 0 filtered out; finished in 266.55s
 ```
 
 ## Interpretation
@@ -91,8 +91,8 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 66 measured; 0 filtered out; fin
 ---
 
 ```
-basic::degenerate_dag::equiv                        ... bench:   3,709,111 ns/iter (+/- 136,433)
-basic::degenerate_dag::limited_equiv                ... bench:   3,937,272 ns/iter (+/- 152,814)
+basic::degenerate_dag::equiv                        ... bench:   3,847,750 ns/iter (+/- 70,649)
+basic::degenerate_dag::limited_equiv                ... bench:   3,974,424 ns/iter (+/- 68,153)
 ```
 
 The basic variant, which is similar to the common `derive`d `PartialEq`, does not detect shared
@@ -109,10 +109,10 @@ with much shallower depth).  With a depth of `18`, `2^19 - 2` recursions are don
 ---
 
 ```
-basic::inverted_list::equiv                         ... bench:     179,331 ns/iter (+/- 37,946)
-basic::inverted_list::limited_equiv                 ... bench:     176,260 ns/iter (+/- 27,371)
-basic::list::equiv                                  ... bench:     152,842 ns/iter (+/- 15,247)
-basic::list::limited_equiv                          ... bench:     169,783 ns/iter (+/- 21,178)
+basic::inverted_list::equiv                         ... bench:     175,439 ns/iter (+/- 12,300)
+basic::inverted_list::limited_equiv                 ... bench:     188,871 ns/iter (+/- 8,864)
+basic::list::equiv                                  ... bench:     161,609 ns/iter (+/- 36,843)
+basic::list::limited_equiv                          ... bench:     166,787 ns/iter (+/- 24,798)
 ```
 
 All variants do `2*length` recursions for lists.
@@ -126,8 +126,8 @@ These cases, with a length of `8,000`, do `16,000` recursions.
 ---
 
 ```
-basic::short_degenerate_dag::equiv                  ... bench:       1,818 ns/iter (+/- 64)
-basic::short_degenerate_dag::limited_equiv          ... bench:       1,970 ns/iter (+/- 68)
+basic::short_degenerate_dag::equiv                  ... bench:       1,942 ns/iter (+/- 82)
+basic::short_degenerate_dag::limited_equiv          ... bench:       2,033 ns/iter (+/- 82)
 ```
 
 These cases, with a depth of `7`, do `254` (`2^8 - 2`) recursions.
@@ -135,10 +135,10 @@ These cases, with a depth of `7`, do `254` (`2^8 - 2`) recursions.
 ---
 
 ```
-basic::short_inverted_list::equiv                   ... bench:       1,681 ns/iter (+/- 53)
-basic::short_inverted_list::limited_equiv           ... bench:       1,898 ns/iter (+/- 49)
-basic::short_list::equiv                            ... bench:       1,782 ns/iter (+/- 42)
-basic::short_list::limited_equiv                    ... bench:       1,700 ns/iter (+/- 67)
+basic::short_inverted_list::equiv                   ... bench:       1,745 ns/iter (+/- 69)
+basic::short_inverted_list::limited_equiv           ... bench:       1,927 ns/iter (+/- 69)
+basic::short_list::equiv                            ... bench:       1,723 ns/iter (+/- 80)
+basic::short_list::limited_equiv                    ... bench:       1,807 ns/iter (+/- 72)
 ```
 
 These cases, with a length of `100`, do `200` recursions.
@@ -146,10 +146,10 @@ These cases, with a length of `100`, do `200` recursions.
 ---
 
 ```
-cycle_safe::degenerate_cyclic::equiv                ... bench:       3,090 ns/iter (+/- 58)
-cycle_safe::degenerate_cyclic::precheck_equiv       ... bench:       7,013 ns/iter (+/- 262)
-cycle_safe::degenerate_dag::equiv                   ... bench:       2,958 ns/iter (+/- 117)
-cycle_safe::degenerate_dag::precheck_equiv          ... bench:       6,040 ns/iter (+/- 228)
+cycle_safe::degenerate_cyclic::equiv                ... bench:       2,988 ns/iter (+/- 53)
+cycle_safe::degenerate_cyclic::precheck_equiv       ... bench:       6,820 ns/iter (+/- 297)
+cycle_safe::degenerate_dag::equiv                   ... bench:       2,931 ns/iter (+/- 86)
+cycle_safe::degenerate_dag::precheck_equiv          ... bench:       6,152 ns/iter (+/- 419)
 ```
 
 The cycle-safe variants do detect shared structure and so do only `2*depth` recursions for the
@@ -161,7 +161,7 @@ variant, each recursion involves hash-table operations, because the "interleave"
 
 For the `equiv` cases, which only do the "interleave" mode, while the `recursion/ns` speed is
 around `10%` as fast, there are only around `0.007%` as many recursions, and so it handles the
-same `degenerate_dag` shape around `125,000%` as fast and handles the `degenerate_cyclic` shape at
+same `degenerate_dag` shape around `130,000%` as fast and handles the `degenerate_cyclic` shape at
 that speed which the basic and only-deep-safe variants cannot handle at any speed.
 
 For the `precheck_equiv` cases, the "precheck" mode, which is like the limited basic variant,
@@ -174,10 +174,10 @@ shared-structure detection.
 ---
 
 ```
-cycle_safe::inverted_list::equiv                    ... bench:     271,584 ns/iter (+/- 25,081)
-cycle_safe::inverted_list::precheck_equiv           ... bench:     267,445 ns/iter (+/- 21,876)
-cycle_safe::list::equiv                             ... bench:     248,335 ns/iter (+/- 27,933)
-cycle_safe::list::precheck_equiv                    ... bench:     258,195 ns/iter (+/- 37,146)
+cycle_safe::inverted_list::equiv                    ... bench:     238,830 ns/iter (+/- 40,060)
+cycle_safe::inverted_list::precheck_equiv           ... bench:     242,658 ns/iter (+/- 40,944)
+cycle_safe::list::equiv                             ... bench:     246,091 ns/iter (+/- 41,619)
+cycle_safe::list::precheck_equiv                    ... bench:     237,945 ns/iter (+/- 63,633)
 ```
 
 Like the basic variant, the cycle-safe variants do `2*length` recursions for lists.  Unlike the
@@ -187,25 +187,25 @@ phase with a basic "fast" phase.
 These cases, with a length of `8,000`, do `16,000` recursions.
 
 For these lists without shared structure, the "slow" phase only does about `10%` of recursions and
-the "fast" phase does about `90%`.  These cases are around `62%` as fast as the basic variant,
+the "fast" phase does about `90%`.  These cases are around `69%` as fast as the basic variant,
 which is not too bad of a trade-off for the ability to also handle cyclic and degenerate graphs
 efficiently.
 
 ---
 
 ```
-cycle_safe::short_degenerate_cyclic::equiv          ... bench:       1,348 ns/iter (+/- 54)
-cycle_safe::short_degenerate_cyclic::precheck_equiv ... bench:       5,649 ns/iter (+/- 164)
-cycle_safe::short_degenerate_dag::equiv             ... bench:       1,278 ns/iter (+/- 20)
-cycle_safe::short_degenerate_dag::precheck_equiv    ... bench:       1,914 ns/iter (+/- 100)
+cycle_safe::short_degenerate_cyclic::equiv          ... bench:       1,323 ns/iter (+/- 40)
+cycle_safe::short_degenerate_cyclic::precheck_equiv ... bench:       5,109 ns/iter (+/- 195)
+cycle_safe::short_degenerate_dag::equiv             ... bench:       1,263 ns/iter (+/- 33)
+cycle_safe::short_degenerate_dag::precheck_equiv    ... bench:       1,955 ns/iter (+/- 35)
 ```
 
 These cases, with a depth of `7`, do only `14` recursions for the `equiv` cases, unlike the basic
 variant.
 
 The "interleave" mode stays in its "slow" phase for all recursions, but the
-`short_degenerate_dag::equiv` case is still faster than `basic` and `deep_safe`, and the
-`short_degenerate_cyclic::equiv` is also fast and can be handled.
+`short_degenerate_dag::equiv` case is still faster than `basic` and `deep_safe` due to less
+recursions, and the `short_degenerate_cyclic::equiv` is also fast and can be handled.
 
 The `short_degenerate_cyclic::precheck_equiv` case wastes the effort of the "precheck" mode on
 this shape that has more basic-traversed edges (infinite) than the precheck limit.
@@ -217,10 +217,10 @@ fast as the `limited_equiv` of the basic variant
 ---
 
 ```
-cycle_safe::short_inverted_list::equiv              ... bench:       6,882 ns/iter (+/- 275)
-cycle_safe::short_inverted_list::precheck_equiv     ... bench:       1,862 ns/iter (+/- 89)
-cycle_safe::short_list::equiv                       ... bench:       4,620 ns/iter (+/- 130)
-cycle_safe::short_list::precheck_equiv              ... bench:       1,750 ns/iter (+/- 75)
+cycle_safe::short_inverted_list::equiv              ... bench:       6,635 ns/iter (+/- 241)
+cycle_safe::short_inverted_list::precheck_equiv     ... bench:       1,820 ns/iter (+/- 57)
+cycle_safe::short_list::equiv                       ... bench:       4,459 ns/iter (+/- 143)
+cycle_safe::short_list::precheck_equiv              ... bench:       1,758 ns/iter (+/- 27)
 ```
 
 These cases, with a length of `100`, do `200` recursions, like the basic variant.
@@ -236,7 +236,7 @@ and degenerate inputs while not wasting too much effort.
 ---
 
 ```
-deep_safe::degenerate_dag::equiv                    ... bench:   3,395,443 ns/iter (+/- 153,561)
+deep_safe::degenerate_dag::equiv                    ... bench:   2,822,701 ns/iter (+/- 140,410)
 ```
 
 The deep-safe variants do not use the normal call-stack and instead use a vector as the stack of
@@ -246,94 +246,96 @@ The `deep_safe` cases, like the basic variant, do not detect shared structure, a
 `2^(depth+1)-2` recursions for the `degenerate_dag` graph shape.  With a depth of `18`, `2^19 - 2`
 recursions are done.
 
-The vector stack is `109%` as fast as the call-stack, comparing this case to
-`basic::degenerate_dag::equiv`.
+The vector stack is `136%` as fast as the call-stack, comparing this case to
+`basic::degenerate_dag::equiv`, presumably due to a vector being faster at pushing and popping due
+to those operations being simpler and smaller than they are for the call-stack.
 
 ---
 
 ```
-deep_safe::inverted_list::equiv                     ... bench:     111,597 ns/iter (+/- 11,637)
-deep_safe::list::equiv                              ... bench:     112,183 ns/iter (+/- 7,879)
+deep_safe::inverted_list::equiv                     ... bench:      91,485 ns/iter (+/- 24,764)
+deep_safe::list::equiv                              ... bench:      88,588 ns/iter (+/- 7,122)
 ```
 
 Like the basic variant, the deep-safe variants do `2*length` recursions for lists.
 
 These cases, with a length of `8,000`, do `16,000` recursions, on a vector stack.
 
-The vector stack is `136%` and `161%` as fast as the call-stack, comparing these cases to the
+The vector stack is `182%` and `192%` as fast as the call-stack, comparing these cases to the
 `basic::list::equiv` and `basic::inverted_list::equiv` cases.
 
 ---
 
 ```
-deep_safe::long_inverted_list::equiv                ... bench:   4,403,571 ns/iter (+/- 629,291)
-deep_safe::long_list::equiv                         ... bench:   6,693,426 ns/iter (+/- 422,358)
+deep_safe::long_inverted_list::equiv                ... bench:   6,459,989 ns/iter (+/- 290,648)
+deep_safe::long_list::equiv                         ... bench:   3,812,624 ns/iter (+/- 395,841)
 ```
 
 These cases, with a length of `2^18`, do `2^19` recursions, on a vector stack.
 
 The same amount of recursions is done as the `degenerate_dag` cases, but with much deeper depth.
-While the `recursion/ns` speed is, at worst, around `50%` as fast, or, at best, around `77%` as
-fast, (comparing `deep_safe::long_list::equiv` or `deep_safe::long_inverted_list::equiv` to
+While the `recursion/ns` speed is, at worst, around `43%` as fast, or, at best, around `74%` as
+fast, (comparing `deep_safe::long_inverted_list::equiv` or `deep_safe::long_list::equiv` to
 `deep_safe::degenerate_dag::equiv`), the deep-safe variants can handle very-deep graphs which the
 basic and only-cycle-safe variants cannot handle at any speed.
 
 While a vector stack is faster than the call stack for the cases with shallower shapes, it is
-slower for these cases.  For the `long_list` shape, this is expected, but for the
-`long_inverted_list` shape, it is unexpected.
+slower for these cases.  For the `long_inverted_list` shape, this is expected, but for the
+`long_list` shape, it is unexpected.
 
-The `long_inverted_list` benefits from a kind of "tail-call elimination" because it descends its
-list elements, which are leaf nodes, before descending its list tails, and so the maximum amount
-of items on its vector stack should be only `2`.  Whereas, `long_list` descends its list tails
-before its list elements, and so the maximum amount of items on its vector stack should be the
-same as its length of `2^18`.
+The `long_list` benefits from a kind of "tail-call elimination" because it descends its list
+elements, which are leaf nodes, before descending its list tails, and so the maximum amount of
+items on its vector stack should be only `2`.  Whereas, `long_inverted_list` descends its list
+tails before its list elements, and so the maximum amount of items on its vector stack should be
+the same as its length of `2^18`.
 
-With `long_list` using so much of a vector there are factors that explain why it is slower than
-`long_inverted_list`.  Linux's demand paging of larger allocations is suspected to be at play,
+With `long_inverted_list` using so much of a vector there are factors that explain why it is
+slower than `long_list`.  Linux's demand paging of larger allocations is suspected to be at play,
 which will cause some slow-down since the cost is not amortized since the vector memory is
 allocated and used only once for each iteration of this case.  Further, twice the initial capacity
 of a vector is used, causing a reallocation for resizing it, for each iteration, which will cause
 more slow-down.
 
-It is currently unexplained why the speed of `deep_safe::long_inverted_list::equiv` is not closer
-to that of `deep_safe::degenerate_dag::equiv`.
+It is currently unexplained why the speed of the `long_list` case is not closer to that of
+`deep_safe::degenerate_dag::equiv`.  It is assumed to not be due to cache-locality differences
+regarding their vector stacks, since they both access only the very beginning of a vector.
 
-(Note about achieving the TCE:  Users control the order that edges are descended for their types,
-and so can achieve TCE for their shapes regardless of whether they are "left-handed" or
-"right-handed".  Unlike with traditional TCE of fixed equivalence predicates.)
+(Note about achieving the TCE outside these benchmarks: Users can control the order that edges are
+descended for their types, and so can achieve TCE for their shapes regardless of whether they are
+"left-handed" or "right-handed".  Unlike with traditional TCE of fixed equivalence predicates.)
 
 ---
 
 ```
-deep_safe::short_degenerate_dag::equiv              ... bench:       1,727 ns/iter (+/- 76)
+deep_safe::short_degenerate_dag::equiv              ... bench:       1,371 ns/iter (+/- 57)
 ```
 
 This case, with a depth of `7`, does `254` (`2^8 - 2`) recursions, like the basic variant, but on
 a vector stack, unlike the basic variant.
 
-The vector stack is `105%` as fast as the call-stack, comparing this case to
+The vector stack is `142%` as fast as the call-stack, comparing this case to
 `basic::short_degenerate_dag::equiv`.
 
 ---
 
 ```
-deep_safe::short_inverted_list::equiv               ... bench:       1,298 ns/iter (+/- 54)
-deep_safe::short_list::equiv                        ... bench:       1,303 ns/iter (+/- 70)
+deep_safe::short_inverted_list::equiv               ... bench:       1,076 ns/iter (+/- 39)
+deep_safe::short_list::equiv                        ... bench:       1,064 ns/iter (+/- 46)
 ```
 
 These cases, with a length of `100`, do `200` recursions, like the basic variant, but on a vector
 stack, unlike the basic variant.
 
-The vector stack is `%137` and `130%` as fast as the call-stack, comparing these cases to
+The vector stack is `162%` as fast as the call-stack, comparing these cases to
 `basic::short_list::equiv` and `basic::short_inverted_list::equiv`.
 
 ---
 
 ```
-robust::degenerate_cyclic::equiv                    ... bench:       3,011 ns/iter (+/- 110)
-robust::degenerate_cyclic::precheck_equiv           ... bench:       5,676 ns/iter (+/- 201)
-robust::degenerate_dag::equiv                       ... bench:       2,952 ns/iter (+/- 76)
-robust::degenerate_dag::precheck_equiv              ... bench:       5,894 ns/iter (+/- 227)
+robust::degenerate_cyclic::equiv                    ... bench:       3,055 ns/iter (+/- 156)
+robust::degenerate_cyclic::precheck_equiv           ... bench:       5,099 ns/iter (+/- 38)
+robust::degenerate_dag::equiv                       ... bench:       2,995 ns/iter (+/- 49)
+robust::degenerate_dag::precheck_equiv              ... bench:       5,287 ns/iter (+/- 145)
 ```
 
 The robust variant is like a combination of `cycle_safe` and `deep_safe`, in that it does detect
@@ -356,10 +358,10 @@ trade-off for the precheck (which benefits different shapes: those that are smal
 ---
 
 ```
-robust::inverted_list::equiv                        ... bench:     187,335 ns/iter (+/- 22,390)
-robust::inverted_list::precheck_equiv               ... bench:     185,101 ns/iter (+/- 27,250)
-robust::list::equiv                                 ... bench:     193,172 ns/iter (+/- 29,298)
-robust::list::precheck_equiv                        ... bench:     194,018 ns/iter (+/- 15,518)
+robust::inverted_list::equiv                        ... bench:     161,694 ns/iter (+/- 9,852)
+robust::inverted_list::precheck_equiv               ... bench:     163,608 ns/iter (+/- 20,359)
+robust::list::equiv                                 ... bench:     156,986 ns/iter (+/- 13,962)
+robust::list::precheck_equiv                        ... bench:     173,661 ns/iter (+/- 22,156)
 ```
 
 Like `basic`, the robust variant does `2*length` recursions for lists.  Like `deep_safe`, a vector
@@ -368,18 +370,18 @@ about `90%` "fast" phase.
 
 These cases, with a length of `8,000`, do `16,000` recursions.
 
-The speed is around `79%`, at worst, as fast as `basic`, is significantly slower than `deep_safe`
-due to the involvement of the "slow" phase of "interleave" mode, and is significantly faster than
-`cycle_safe` due to the use of a vector stack, which improves the attractiveness of the trade-off
-for the cycle-safety, and it also has the deep-safety.
+The speed is as fast as `basic`, is significantly slower than `deep_safe` due to the involvement
+of the "slow" phase of "interleave" mode, and is significantly faster than `cycle_safe` due to the
+use of a vector stack, which improves the attractiveness of the trade-off for the cycle-safety,
+and it also has the deep-safety.
 
 ---
 
 ```
-robust::long_degenerate_cyclic::equiv               ... bench: 115,256,800 ns/iter (+/- 11,149,944)
-robust::long_degenerate_cyclic::precheck_equiv      ... bench: 113,632,758 ns/iter (+/- 11,256,653)
-robust::long_degenerate_dag::equiv                  ... bench: 114,925,357 ns/iter (+/- 10,666,182)
-robust::long_degenerate_dag::precheck_equiv         ... bench: 113,278,800 ns/iter (+/- 9,800,128)
+robust::long_degenerate_cyclic::equiv               ... bench: 112,770,332 ns/iter (+/- 6,191,108)
+robust::long_degenerate_cyclic::precheck_equiv      ... bench: 109,561,112 ns/iter (+/- 6,810,804)
+robust::long_degenerate_dag::equiv                  ... bench: 112,442,771 ns/iter (+/- 6,530,739)
+robust::long_degenerate_dag::precheck_equiv         ... bench: 108,724,493 ns/iter (+/- 5,582,998)
 ```
 
 These shapes are degenerate pair-chains but their depth is `2^18` which is the same as the length
@@ -391,8 +393,8 @@ required.  For `cycle_safe`, the depth would cause stack-overflow crash.
 
 While the amount of recursions is the same as `basic::degenerate_dag` and `deep_safe::long_list`,
 the "interleave" mode stays in its "slow" phase for all recursions, like `cycle_safe`.  This is
-why the `recursion/ns` speed is `3%` as fast as `basic`.  That is the trade-off for the ability to
-handle these very-deep degenerate shapes which all other variants cannot.
+why the `recursion/ns` speed is `3%` as fast as `basic` and `deep_safe`.  That is the trade-off
+for the ability to handle these very-deep degenerate shapes which all other variants cannot.
 
 It is currently unexplained why the speed of the `precheck_equiv` cases was slightly faster than
 the `equiv` cases, when the additional effort of the "precheck" mode is always wasted for these
@@ -401,10 +403,10 @@ shapes.
 ---
 
 ```
-robust::long_inverted_list::equiv                   ... bench:   8,724,244 ns/iter (+/- 1,839,951)
-robust::long_inverted_list::precheck_equiv          ... bench:   8,907,767 ns/iter (+/- 1,634,104)
-robust::long_list::equiv                            ... bench:  12,276,208 ns/iter (+/- 1,079,487)
-robust::long_list::precheck_equiv                   ... bench:  14,883,785 ns/iter (+/- 2,294,494)
+robust::long_inverted_list::equiv                   ... bench:  12,539,428 ns/iter (+/- 1,318,153)
+robust::long_inverted_list::precheck_equiv          ... bench:  11,193,337 ns/iter (+/- 972,868)
+robust::long_list::equiv                            ... bench:   8,377,566 ns/iter (+/- 628,553)
+robust::long_list::precheck_equiv                   ... bench:  12,078,208 ns/iter (+/- 996,303)
 ```
 
 These cases, with a length of `2^18`, do `2^19` recursions, on a vector stack, like
@@ -416,15 +418,16 @@ The "interleave" mode is used with about `10%` "slow" phase and about `90%` "fas
 have the same amount of recursions.
 
 The benefit from the kind of "tail-call elimination" with a vector stack is why the
-`long_inverted_list` cases are faster than the `long_list`, like the `deep_safe::long` cases.
+`long_list::equiv` case is faster than the `long_inverted_list::equiv`, like the `deep_safe::long`
+cases.
 
 ---
 
 ```
-robust::short_degenerate_cyclic::equiv              ... bench:       1,378 ns/iter (+/- 131)
-robust::short_degenerate_cyclic::precheck_equiv     ... bench:       4,055 ns/iter (+/- 160)
-robust::short_degenerate_dag::equiv                 ... bench:       1,339 ns/iter (+/- 48)
-robust::short_degenerate_dag::precheck_equiv        ... bench:       1,895 ns/iter (+/- 107)
+robust::short_degenerate_cyclic::equiv              ... bench:       1,371 ns/iter (+/- 32)
+robust::short_degenerate_cyclic::precheck_equiv     ... bench:       3,463 ns/iter (+/- 147)
+robust::short_degenerate_dag::equiv                 ... bench:       1,303 ns/iter (+/- 35)
+robust::short_degenerate_dag::precheck_equiv        ... bench:       1,514 ns/iter (+/- 22)
 ```
 
 These cases, with a depth of `7`, do only `14` recursions for the `equiv` cases, like
@@ -437,10 +440,10 @@ wasted prechecks by a little).
 ---
 
 ```
-robust::short_inverted_list::equiv                  ... bench:       4,389 ns/iter (+/- 217)
-robust::short_inverted_list::precheck_equiv         ... bench:       1,473 ns/iter (+/- 73)
-robust::short_list::equiv                           ... bench:       4,424 ns/iter (+/- 295)
-robust::short_list::precheck_equiv                  ... bench:       1,563 ns/iter (+/- 78)
+robust::short_inverted_list::equiv                  ... bench:       3,704 ns/iter (+/- 208)
+robust::short_inverted_list::precheck_equiv         ... bench:       1,205 ns/iter (+/- 50)
+robust::short_list::equiv                           ... bench:       3,647 ns/iter (+/- 283)
+robust::short_list::precheck_equiv                  ... bench:       1,157 ns/iter (+/- 29)
 ```
 
 These cases, with a length of `100`, do `200` recursions, like the other variants.
@@ -457,12 +460,12 @@ wasting too much effort.
 ---
 
 ```
-derived_eq::degenerate_dag::eq                      ... bench:   1,158,603 ns/iter (+/- 49,270)
-derived_eq::inverted_list::eq                       ... bench:      75,044 ns/iter (+/- 15,041)
-derived_eq::list::eq                                ... bench:      70,195 ns/iter (+/- 11,495)
-derived_eq::short_degenerate_dag::eq                ... bench:         544 ns/iter (+/- 24)
-derived_eq::short_inverted_list::eq                 ... bench:         607 ns/iter (+/- 75)
-derived_eq::short_list::eq                          ... bench:         422 ns/iter (+/- 20)
+derived_eq::degenerate_dag::eq                      ... bench:   1,178,313 ns/iter (+/- 75,761)
+derived_eq::inverted_list::eq                       ... bench:      88,380 ns/iter (+/- 29,681)
+derived_eq::list::eq                                ... bench:      74,408 ns/iter (+/- 7,253)
+derived_eq::short_degenerate_dag::eq                ... bench:         564 ns/iter (+/- 11)
+derived_eq::short_inverted_list::eq                 ... bench:         752 ns/iter (+/- 114)
+derived_eq::short_list::eq                          ... bench:         448 ns/iter (+/- 11)
 ```
 
 The common `derive`d `PartialEq` is faster than all of the other variants, for the limited shapes

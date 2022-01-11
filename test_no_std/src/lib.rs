@@ -16,6 +16,7 @@ mod my
 
     impl Node for My
     {
+        type Cmp = bool;
         type Id = ();
         type Index = u8;
 

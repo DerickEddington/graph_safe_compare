@@ -19,6 +19,7 @@ struct My(DatumRef);
 
 impl Node for My
 {
+    type Cmp = bool;
     type Id = *const dyn Any;
     type Index = usize;
 

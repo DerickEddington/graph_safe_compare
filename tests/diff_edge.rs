@@ -45,6 +45,7 @@ pub struct My3(Rc<Datum3>);
 
 impl Node for My
 {
+    type Cmp = bool;
     type Id = *const ();
     type Index = u16;
 

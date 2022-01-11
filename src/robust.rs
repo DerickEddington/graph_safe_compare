@@ -17,9 +17,13 @@ use {
             equiv_classes::premade::hash_map,
             precheck_interleave,
         },
+        utils::IntoOk as _,
         Node,
     },
-    core::marker::PhantomData,
+    core::{
+        convert::Infallible,
+        marker::PhantomData,
+    },
 };
 
 
@@ -48,17 +52,18 @@ impl<N: Node> vecstack::Params for Args<N>
 pub fn equiv<N: Node>(
     a: &N,
     b: &N,
-) -> bool
+) -> N::Cmp
 {
     impl<N: Node> equiv::Params for Args<N>
     {
         type DescendMode = Interleave<Self>;
+        type Error = Infallible;
         type Node = N;
         type RecurStack = VecStack<Self>;
     }
 
     let mut e = Equiv::<Args<N>>::default();
-    e.is_equiv(a, b)
+    e.equiv(a, b).into_ok()
 }
 
 
@@ -67,14 +72,15 @@ pub fn equiv<N: Node>(
 pub fn precheck_equiv<N: Node>(
     a: &N,
     b: &N,
-) -> bool
+) -> N::Cmp
 {
     impl<N: Node> precheck_interleave::Params<N> for Args<N>
     {
+        type Error = Infallible;
         type InterleaveParams = Self;
         type InterleaveRecurStack = VecStack<Self>;
         type PrecheckRecurStack = VecStack<Self>;
     }
 
-    precheck_interleave::equiv::<N, Args<N>>(a, b)
+    precheck_interleave::equiv::<N, Args<N>>(a, b).into_ok()
 }

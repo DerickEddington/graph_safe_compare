@@ -63,12 +63,6 @@
 )]
 
 
-use core::{
-    hash::Hash,
-    ops::AddAssign,
-};
-
-
 #[cfg(feature = "std")]
 /// Items that are safe for cyclic, degenerate, and very-deep graphs.
 pub mod robust;
@@ -90,10 +84,34 @@ pub mod basic;
 /// deep-safety.
 pub mod generic;
 
+/// Miscellaneous utilities that are sometimes useful.
+pub mod utils;
+
+
+use core::{
+    cmp::Ordering,
+    hash::Hash,
+    ops::{
+        AddAssign,
+        SubAssign,
+    },
+};
+
 
 /// What the algorithm requires from a type, to be applied to it.
 pub trait Node
 {
+    /// Result of comparing nodes.  Common choices are [`bool`] or [`Ordering`], but it may be
+    /// anything that satisfies the trait bounds.
+    ///
+    /// The result value of the algorithm is that of the first node traversed that compares as
+    /// inequivalent, or it is the value that represents equivalence.  E.g. this enables using
+    /// types like [`Ordering`] to achieve giving an ordering to graphs that are compared, in
+    /// addition to determining equivalence.
+    ///
+    /// For types where only boolean equivalence is appropriate, [`bool`] should be used.
+    type Cmp: Cmp;
+
     /// Determines when nodes are the same identical node and so can immediately be considered
     /// equivalent without checking their values, edges, nor descendents.  The size of and methods
     /// on this type should be small and very cheap.
@@ -116,17 +134,17 @@ pub trait Node
     /// The primitive unsigned integer types, like `usize`, are a common choice, but it may be
     /// anything that satisfies the trait bounds.
     ///
-    /// Only `Self::Index::from(0)`, `Self::Index::from(1)`, and `Self::Index::add_assign(index,
-    /// 1.into())` are actually used by the algorithm, and so the type does not actually have to
-    /// support `From<u8>` for the rest of the `u8` range, and does not actually have to support
-    /// `AddAssign` of increments other than the unit value nor of results beyond the maximum
-    /// possible amount of edges.
+    /// Only `Self::Index::from(0)`, `Self::Index::from(1)`, `Self::Index::add_assign(index,
+    /// 1.into())`, and `Self::Index::sub_assign(index, 1.into())` are actually used by the crate,
+    /// and so the type does not actually have to support `From<u8>` for the rest of the `u8`
+    /// range, and does not actually have to support `AddAssign` and `SubAssign` of other than the
+    /// unit value nor of results beyond the maximum possible amount of edges.
     ///
     /// E.g. for graphs with nodes whose amounts of edges are always smaller than some limit, it
     /// might be desirable, for efficiency, to use an index type smaller than `usize`.  Or for
     /// other node types, it might be more logical or convenient to use an index type that is not
     /// a number.
-    type Index: Eq + Ord + AddAssign + From<u8>;
+    type Index: Eq + Ord + AddAssign + SubAssign + From<u8> + Clone;
 
     /// Get the identity of the `self` node.  The result must only be `==` to another node's when
     /// the nodes should be considered identical.
@@ -142,7 +160,6 @@ pub trait Node
     /// to descend into each edge.
     ///
     /// # Panics
-    ///
     /// Panics if the index is out of bounds.  But since the same implementor controls
     /// [`Self::amount_edges`], and when that is implemented correctly, as it must be, then such
     /// out-of-bounds panics are impossible, as used by the algorithm.
@@ -166,10 +183,10 @@ pub trait Node
     /// ```
     ///
     /// Requires that the implementor decide whether the value of the `value` field should affect
-    /// equivalence.  Either way is supported.  The implementor could decide to always return
-    /// `true` to ignore the field and allow the algorithm to just compare the descendent, or the
-    /// implementor could make the result correspond to whether the values of the field are the
-    /// same or not.
+    /// comparison.  Either way is supported.  The implementor could decide to always return
+    /// "equivalent" to ignore the field and allow the algorithm to just compare the descendent,
+    /// or the implementor could make the result correspond to whether the values of the field are
+    /// the same or not.
     ///
     /// Or, e.g. a node type like:
     ///
@@ -181,11 +198,11 @@ pub trait Node
     /// ```
     ///
     /// Requires that the implementor decide whether the difference between the `A` and `B`
-    /// variants should affect equivalence.  Either way is supported.  Since both variants have
-    /// the same amount of edges (assuming [`Self::amount_edges`] is implemented like that), the
-    /// implementor could decide to always return `true` to ignore differences in the variants and
-    /// allow the algorithm to just compare the descendents, or the implementor could make the
-    /// result correspond to whether the variants are the same or not.
+    /// variants should affect comparison.  Either way is supported.  Since both variants have the
+    /// same amount of edges (assuming [`Self::amount_edges`] is implemented like that), the
+    /// implementor could decide to always return "equivalent" to ignore differences in the
+    /// variants and allow the algorithm to just compare the descendents, or the implementor could
+    /// make the result correspond to whether the variants are the same or not.
     ///
     /// Or, e.g. a node type like:
     ///
@@ -196,26 +213,26 @@ pub trait Node
     /// }
     /// ```
     ///
-    /// It is sufficient to always return `true`, when [`Self::amount_edges`] returns `0.into()`
-    /// for the `A` variant or `1.into()` for the `B` variant, because this is used by
+    /// It is sufficient to always return "equivalent", when [`Self::amount_edges`] returns
+    /// `0.into()` for the `A` variant or `1.into()` for the `B` variant, because that is used by
     /// [`Self::equiv_modulo_descendents_then_amount_edges`] and the algorithm will detect the
     /// unequivalence that way instead.
     fn equiv_modulo_edges(
         &self,
         other: &Self,
-    ) -> bool;
+    ) -> Self::Cmp;
 
     /// Check if the nodes are equivalent in their own directly-contained semantically-significant
-    /// values ignoring their descendent nodes and check if their amounts of edges are similar
+    /// values ignoring their descendent nodes, and check if their amounts of edges are similar
     /// enough that their descendents will need to be checked for equivalence.  If both conditions
-    /// are true, return the amount of edges that the algorithm should descend, else return
-    /// `None`.
+    /// are true, return the amount of edges that the algorithm should descend, else return the
+    /// inequivalence result of comparison.
     ///
     /// The implementor must use [`Self::equiv_modulo_edges`] and [`Self::amount_edges`] to check
     /// the conditions, but may do so in any order.  This allows the implementation to optimize
     /// the order to be the most efficient for its type.
     ///
-    /// The implementor must ensure that a `Some(result)` upholds: `self.amount_edges() >= result
+    /// The implementor must ensure that an `Ok(result)` upholds: `self.amount_edges() >= result
     /// && other.amount_edges() >= result`, so that there are enough descendents of each to
     /// descend into.
     ///
@@ -226,13 +243,85 @@ pub trait Node
     /// considered unequivalent if their amounts of edges are not the same, and where all the
     /// edges should be descended.  For types that do not want all of those aspects, a custom
     /// implementation will need to be provided, and it must fulfill all the above requirements.
+    ///
+    /// # Errors
+    /// If the conditions are not both true, returns an `Err` with the value that represents the
+    /// inequivalence.
     #[inline]
     fn equiv_modulo_descendents_then_amount_edges(
         &self,
         other: &Self,
-    ) -> Option<Self::Index>
+    ) -> Result<Self::Index, Self::Cmp>
     {
         let (az, bz) = (self.amount_edges(), other.amount_edges());
-        (az == bz && self.equiv_modulo_edges(other)).then(|| az)
+        let cmp_amount_edges = Self::Cmp::from_ord(az.cmp(&bz));
+        if cmp_amount_edges.is_equiv() {
+            let cmp_modulo_edges = self.equiv_modulo_edges(other);
+            if cmp_modulo_edges.is_equiv() { Ok(az) } else { Err(cmp_modulo_edges) }
+        }
+        else {
+            Err(cmp_amount_edges)
+        }
+    }
+}
+
+
+/// Represents comparison of nodes.
+///
+/// Node types may have richer multi-way comparison than boolean equivalence.
+pub trait Cmp
+{
+    /// Create a new value that represents equivalence is true.
+    fn new_equiv() -> Self;
+
+    /// Return `true` if the value represents equivalence, `false` if not.
+    fn is_equiv(&self) -> bool;
+
+    /// Create a new value that most-accurately represents the given `Ordering` value.
+    ///
+    /// Intended for representing comparisons of results of [`Node::amount_edges`], as returned by
+    /// the `Err` case of [`Node::equiv_modulo_descendents_then_amount_edges`].
+    fn from_ord(ord: Ordering) -> Self;
+}
+
+impl Cmp for bool
+{
+    #[inline]
+    fn new_equiv() -> Self
+    {
+        true
+    }
+
+    #[inline]
+    fn is_equiv(&self) -> bool
+    {
+        *self
+    }
+
+    #[inline]
+    fn from_ord(ord: Ordering) -> Self
+    {
+        ord.is_eq()
+    }
+}
+
+impl Cmp for Ordering
+{
+    #[inline]
+    fn new_equiv() -> Self
+    {
+        Ordering::Equal
+    }
+
+    #[inline]
+    fn is_equiv(&self) -> bool
+    {
+        self.is_eq()
+    }
+
+    #[inline]
+    fn from_ord(ord: Ordering) -> Self
+    {
+        ord
     }
 }

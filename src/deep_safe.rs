@@ -13,9 +13,13 @@ mod premade
                 self,
                 Equiv,
             },
+            utils::IntoOk as _,
             Node,
         },
-        core::marker::PhantomData,
+        core::{
+            convert::Infallible,
+            marker::PhantomData,
+        },
     };
 
     /// Equivalence predicate that can handle very-deep graphs but not cyclic graphs.
@@ -23,13 +27,14 @@ mod premade
     pub fn equiv<N: Node>(
         a: &N,
         b: &N,
-    ) -> bool
+    ) -> N::Cmp
     {
         struct Args<N>(PhantomData<N>);
 
         impl<N: Node> equiv::Params for Args<N>
         {
             type DescendMode = Unlimited;
+            type Error = Infallible;
             type Node = N;
             type RecurStack = VecStack<Self>;
         }
@@ -40,7 +45,7 @@ mod premade
         }
 
         let mut e = Equiv::<Args<N>>::default();
-        e.is_equiv(a, b)
+        e.equiv(a, b).into_ok()
     }
 }
 
@@ -61,13 +66,18 @@ pub mod recursion
                 basic::recursion::callstack::CallStack,
                 generic::equiv::{
                     self,
-                    Aborted,
                     Equiv,
                     RecurStack,
                 },
+                utils::RangeIter,
+                Cmp,
                 Node,
             },
             alloc::vec::Vec,
+            core::{
+                convert::Infallible,
+                iter::Rev,
+            },
         };
 
         /// Generic parameters of [`VecStack`] and its operations.
@@ -104,6 +114,8 @@ pub mod recursion
         /// corresponds to the maximum graph depth, is limited only by available memory.
         /// Specifies use of this.
         ///
+        /// Does depth-first preorder traversals.
+        ///
         /// (If, instead, you want to limit how much a recursion-stack can grow, you must `impl`
         /// [`RecurStack`] for your own type that does that and use it with the
         /// [`generic`](crate::generic) API.)
@@ -136,16 +148,27 @@ pub mod recursion
         where
             E: equiv::Params<RecurStack = Self>,
             V: Params<Node = E::Node>,
+            Infallible: Into<E::Error>,
         {
+            type Error = Infallible;
+            /// Recur on edges in left-to-right order, consistent with [`CallStack`].
+            type IndexIter = Rev<RangeIter<<E::Node as Node>::Index>>;
+
+            #[inline]
+            fn index_iter(end: <E::Node as Node>::Index) -> Self::IndexIter
+            {
+                RangeIter(0.into() .. end).rev()
+            }
+
             #[inline]
             fn recur(
                 it: &mut Equiv<E>,
                 a: E::Node,
                 b: E::Node,
-            ) -> Result<bool, Aborted>
+            ) -> Result<<E::Node as Node>::Cmp, Self::Error>
             {
                 it.recur_stack.0.push((a, b));
-                Ok(true)
+                Ok(Cmp::new_equiv())
             }
 
             #[inline]
