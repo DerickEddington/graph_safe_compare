@@ -146,14 +146,21 @@ struct Dropper<T: Pair>(T);
 
 impl<T: Pair> Drop for Dropper<T>
 {
+    /// Take descendents out of pairs, and mutate pairs to become leafs, before a previously-pair
+    /// is dropped, so that dropping as a now-leaf does no call-stack recursions.
+    ///
+    /// Traversal is done breadth-first because it uses only small constant space for any pair
+    /// shape.
     fn drop(&mut self)
     {
+        use std::collections::VecDeque;
+
         if let Some((a, b)) = Pair::take(&self.0) {
-            let mut recur_stack = vec![b, a];
-            while let Some(n) = recur_stack.pop() {
+            let mut recur_queue = VecDeque::from([a, b]);
+            while let Some(n) = recur_queue.pop_front() {
                 if let Some((a, b)) = Pair::take(&n) {
-                    recur_stack.push(b);
-                    recur_stack.push(a);
+                    recur_queue.push_back(a);
+                    recur_queue.push_back(b);
                 }
             }
         }
