@@ -14,7 +14,7 @@ pub use {
 };
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct My(pub Rc<Datum>);
 
 impl Node for My

@@ -47,6 +47,11 @@ pub trait Pair: Leaf
     {
         <Self as Pair>::new_in(a, b, &Self::Alloc::default())
     }
+
+    fn needs_cycle_deep_safe_drop() -> bool
+    {
+        true
+    }
 }
 
 
@@ -95,8 +100,12 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
     {
         let depth = self.depth;
         self.depth = self.depth.saturating_sub(1);
-        let (head, tail) = self.degenerate();
+        let (mut head, tail) = self.degenerate();
         if depth >= 1 {
+            Pair::set(&tail, head.clone(), head.clone());
+            // Help types that lazily generate values, like `node_types::lazy` does.
+            // For other types, this is valid but redundant.
+            head = Pair::take(&tail).expect("pair").0;
             Pair::set(&tail, head.clone(), head.clone());
         }
         (head, tail)
@@ -155,12 +164,13 @@ impl<T: Pair> Drop for Dropper<T>
 /// [`Pair`] type.
 pub fn cycle_deep_safe_drop<T: Pair, const N: usize>(graphs: [(T, T); N])
 {
-    for (head, tail) in graphs {
-        // Enable dropping to free the memory of shapes that were cyclic, by resetting their tails
-        // to no longer form cycles if they did.
-        drop(Pair::take(&tail));
-        // Now dropping will free the memory (unless the type is `Copy`, in which case it should
-        // be a `&` reference, and so is not a concern).
-        drop(Dropper(head));
+    if T::needs_cycle_deep_safe_drop() {
+        for (head, tail) in graphs {
+            // Enable dropping to free the memory of shapes that were cyclic, by resetting their
+            // tails to no longer form cycles if they did.
+            drop(Pair::take(&tail));
+            // Now dropping will free the memory.
+            drop(Dropper(head));
+        }
     }
 }

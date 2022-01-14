@@ -61,6 +61,11 @@ impl<'l> Pair for &'l Datum<'l>
         let inner = self.0.replace(Inner::Leaf);
         if let Inner::Pair(a, b) = inner { Some((a, b)) } else { None }
     }
+
+    fn needs_cycle_deep_safe_drop() -> bool
+    {
+        false
+    }
 }
 
 

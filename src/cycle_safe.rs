@@ -124,7 +124,7 @@ pub mod modes
         /// [`Params`] for your own type and using it with the [`generic`](crate::generic) API.
         pub trait Params
         {
-            /// How many edges are descended by a separate precheck before it aborts.
+            /// How many nodes are traversed by a separate precheck before it aborts.
             ///
             /// Only directly used by a separate precheck when [`Interleave`] is used after that
             /// (e.g. [`precheck_interleave::equiv`](crate::generic::precheck_interleave::equiv)).
@@ -133,11 +133,11 @@ pub mod modes
             /// constants to be defined in terms of it.  You may redefine only this and the others
             /// will be derived from that, or you may redefine the others.
             const PRECHECK_LIMIT: u16 = 400;
-            /// Maximum of randomized limiting of how many edges are descended by the "fast" phase
+            /// Maximum of randomized limiting of how many nodes are traversed by the "fast" phase
             /// before switching to the "slow" phase.
             const FAST_LIMIT_MAX: u16 = 2 * Self::PRECHECK_LIMIT;
-            /// How many node edges, consecutively, that have not already been seen, are descended
-            /// by the "slow" phase before switching to the "fast" phase.
+            /// How many nodes, consecutively, that have not already been seen, are traversed by
+            /// the "slow" phase before switching to the "fast" phase.
             #[allow(clippy::integer_division)]
             const SLOW_LIMIT: u16 = Self::PRECHECK_LIMIT / 10;
 
@@ -154,8 +154,7 @@ pub mod modes
         /// Specifies use of the "interleave" mode.
         pub struct Interleave<P: Params>
         {
-            /// Decremented for every node edge descended into, and reset when the phase is
-            /// changed.
+            /// Decremented for every node traversed, and reset when the phase is changed.
             ticker:        i32,
             /// Table of nodes that have already been seen and recorded as equivalent, for use by
             /// the "slow" phase.
@@ -164,8 +163,15 @@ pub mod modes
             rng:           P::RNG,
         }
 
+        #[allow(clippy::as_conversions, clippy::integer_division)]
         impl<P: Params> Interleave<P>
         {
+            /// How many additional leaf nodes may be traversed, after the "slow" phase limit was
+            /// exceeded, and still reset to "fast" phase.  If this is reached, reset to "slow"
+            /// phase instead, because fast traversal of leaf nodes was already just done for a
+            /// period.
+            pub const BELOW_SLOW_LIMIT: i32 =
+                Self::SLOW_LIMIT_NEG - ((P::FAST_LIMIT_MAX / 4) as i32);
             /// Exclusive end of range, derived from
             /// [`P::FAST_LIMIT_MAX`](Params::FAST_LIMIT_MAX).
             pub const FAST_LIMIT_MAX_RANGE_END: NonZeroU16 =
@@ -175,7 +181,6 @@ pub mod modes
                     None => panic!(),
                 };
             /// Negated [`P::SLOW_LIMIT`](Params::SLOW_LIMIT).
-            #[allow(clippy::as_conversions)]
             pub const SLOW_LIMIT_NEG: i32 = -(P::SLOW_LIMIT as i32);
         }
 
@@ -185,7 +190,7 @@ pub mod modes
             fn default() -> Self
             {
                 Self {
-                    ticker:        -1,
+                    ticker:        0,
                     equiv_classes: EquivClasses::default(),
                     rng:           P::RNG::default(),
                 }
@@ -217,7 +222,13 @@ pub mod modes
                     true
                 }
                 // "slow" limit reached, change to "fast" phase
-                else if self.ticker < Self::SLOW_LIMIT_NEG {
+                else if self.ticker < Self::SLOW_LIMIT_NEG
+                // When `ticker <= BELOW_SLOW_LIMIT`, that means leaf nodes (possibly many) were
+                // traversed without calling this method, which was fast, and so "slow" phase
+                // should now be done (this is critical for balancing performance for both
+                // very-wide degenerate and very-long narrow leafy shapes).
+                    && Self::BELOW_SLOW_LIMIT < self.ticker
+                {
                     // Random limits for "fast" "reduce the likelihood of repeatedly tripping on
                     // worst-case behavior in cases where the sizes of the input graphs happen to
                     // be related to the chosen bounds in a bad way".
@@ -232,7 +243,7 @@ pub mod modes
                     // Reset the ticker so that "slow" will be used for longer, "on the theory
                     // that if one equivalence is found, more are likely to be found" (which is
                     // critical for avoiding stack overflow with shapes like "degenerate cyclic").
-                    self.ticker = -1;
+                    self.ticker = 0;
                     false
                 }
                 else {
@@ -241,9 +252,10 @@ pub mod modes
                 Ok(r)
             }
 
-            /// When [`Self::do_edges`] returns `true`, descend into edges without limit.
+            /// Decrement the ticker before [`Self::do_edges`] is called, and traverse nodes
+            /// without limit.
             #[inline]
-            fn do_recur(&mut self) -> Result<bool, Self::Error>
+            fn do_traverse(&mut self) -> Result<bool, Self::Error>
             {
                 self.ticker = self.ticker.saturating_sub(1);
                 Ok(true)

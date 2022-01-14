@@ -56,8 +56,8 @@ mod premade
     }
 
 
-    /// Equivalence predicate that limits how many node edges are descended, and that aborts early
-    /// if the limit is reached.  Like [`equiv`](equiv()), this cannot handle cyclic nor very-deep
+    /// Equivalence predicate that limits how many nodes are traversed, and that aborts early if
+    /// the limit is reached.  Like [`equiv`](equiv()), this cannot handle cyclic nor very-deep
     /// graphs and has minimal overhead.
     ///
     /// # Errors
@@ -94,10 +94,11 @@ pub mod recursion
         use crate::{
             generic::equiv::{
                 self,
+                EdgesIter,
                 Equiv,
                 RecurStack,
             },
-            utils::RangeIter,
+            Cmp,
             Node,
         };
 
@@ -113,28 +114,20 @@ pub mod recursion
         where P: equiv::Params<RecurStack = Self>
         {
             type Error = P::Error;
-            #[cfg_attr(
-                feature = "alloc",
-                doc = "Recur on edges in left-to-right order, consistent with \
-                       [`VecStack`](crate::deep_safe::recursion::vecstack::VecStack)."
-            )]
-            #[cfg_attr(not(feature = "alloc"), doc = "Recur on edges in left-to-right order.")]
-            type IndexIter = RangeIter<<P::Node as Node>::Index>;
-
-            #[inline]
-            fn index_iter(end: <P::Node as Node>::Index) -> Self::IndexIter
-            {
-                RangeIter(0.into() .. end)
-            }
 
             #[inline]
             fn recur(
                 it: &mut Equiv<P>,
-                a: P::Node,
-                b: P::Node,
+                edges_iter: EdgesIter<P::Node>,
             ) -> Result<<P::Node as Node>::Cmp, Self::Error>
             {
-                it.equiv_main(&a, &b)
+                for (a, b) in edges_iter {
+                    match it.equiv_main(&a, &b) {
+                        Ok(cmp) if cmp.is_equiv() => (),
+                        result => return result,
+                    }
+                }
+                Ok(Cmp::new_equiv())
             }
 
             #[inline]
@@ -157,7 +150,7 @@ pub mod recursion
 /// Modes of the algorithm that are useful in basic ways.
 pub mod modes
 {
-    /// Do not limit the algorithm in how many node edges are descended, and never abort early.
+    /// Do not limit the algorithm in how many nodes are traversed, and never abort early.
     pub mod unlimited
     {
         use {
@@ -168,7 +161,7 @@ pub mod modes
             core::convert::Infallible,
         };
 
-        /// Specifies not limiting the amount of node edges descended.
+        /// Specifies not limiting the amount of nodes traversed.
         #[derive(Default)]
         #[allow(clippy::exhaustive_structs)]
         pub struct Unlimited;
@@ -192,16 +185,16 @@ pub mod modes
                 Ok(true)
             }
 
-            /// Always descend into edges, without limit.
+            /// Always traverse nodes, without limit.
             #[inline]
-            fn do_recur(&mut self) -> Result<bool, Self::Error>
+            fn do_traverse(&mut self) -> Result<bool, Self::Error>
             {
                 Ok(true)
             }
         }
     }
 
-    /// Limit the algorithm in how many node edges it is allowed to descend before aborting early.
+    /// Limit the algorithm in how many nodes it is allowed to traverse before aborting early.
     pub mod limited
     {
         mod sealed
@@ -225,7 +218,7 @@ pub mod modes
             DescendMode,
         };
 
-        /// Specifies limiting the amount of node edges descended.  The inner value is the limit.
+        /// Specifies limiting the amount of nodes traversed.  The inner value is the limit.
         #[allow(clippy::exhaustive_structs)]
         pub struct Limited<T>(pub T);
 
@@ -254,9 +247,9 @@ pub mod modes
                 Ok(true)
             }
 
-            /// Enforce the limit on the amount of edges descended into.
+            /// Enforce the limit on the amount of nodes traversed.
             #[inline]
-            fn do_recur(&mut self) -> Result<bool, Self::Error>
+            fn do_traverse(&mut self) -> Result<bool, Self::Error>
             {
                 if self.0 > 0.into() {
                     self.0 -= 1.into();
@@ -399,20 +392,21 @@ mod tests
 
         use ResultLimit::*;
 
-        assert_eq!(eqv(&leaf(), &leaf(), 42), True(42));
-        assert_eq!(eqv(&leaf(), &leaf(), 0), True(0));
-        assert_eq!(eqv(&leaf(), &end_pair(), 42), False(42));
-        assert_eq!(eqv(&end_pair(), &leaf(), 42), False(42));
-        assert_eq!(eqv(&end_pair(), &end_pair(), 7), True(5));
-        assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 7), True(3));
+        assert_eq!(eqv(&leaf(), &leaf(), 42), True(41));
+        assert_eq!(eqv(&leaf(), &leaf(), 1), True(0));
+        assert_eq!(eqv(&leaf(), &leaf(), 0), Abort(0));
+        assert_eq!(eqv(&leaf(), &end_pair(), 42), False(41));
+        assert_eq!(eqv(&end_pair(), &leaf(), 42), False(41));
+        assert_eq!(eqv(&end_pair(), &end_pair(), 7), True(4));
+        assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 7), True(2));
         assert_eq!(eqv(&end_pair(), &end_pair(), 0), Abort(0));
-        assert_eq!(eqv(&end_pair(), &end_pair(), 1), Abort(0));
+        assert_eq!(eqv(&end_pair(), &end_pair(), 2), Abort(0));
         assert_eq!(eqv(&pair(leaf(), end_pair()), &pair(leaf(), end_pair()), 1), Abort(0));
-        assert_eq!(eqv(&pair(leaf(), leaf()), &pair(leaf(), end_pair()), 42), False(40));
+        assert_eq!(eqv(&pair(leaf(), leaf()), &pair(leaf(), end_pair()), 42), False(39));
         assert_eq!(
             {
                 let x = pair(end_pair(), leaf());
-                eqv(&x, &x, 0)
+                eqv(&x, &x, 1)
             },
             True(0)
         );

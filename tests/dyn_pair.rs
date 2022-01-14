@@ -14,7 +14,7 @@ use {
 };
 
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct My(DatumRef);
 
 impl Node for My

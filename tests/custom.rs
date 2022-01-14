@@ -111,22 +111,21 @@ mod custom_recur_stack
             My,
         },
         alloc::collections::LinkedList,
-        core::iter::Rev,
         cycle_deep_safe_compare::{
             basic::recursion::callstack::CallStack,
             generic::equiv::{
                 self,
+                EdgesIter,
                 Equiv,
                 RecurStack,
             },
-            utils::RangeIter,
             Cmp,
             Node,
         },
     };
 
     #[derive(Default)]
-    pub struct ListStack(LinkedList<(My, My)>);
+    pub struct ListStack(LinkedList<EdgesIter<My>>);
 
     #[derive(Debug)]
     pub struct ExhaustedError;
@@ -137,22 +136,14 @@ mod custom_recur_stack
         ExhaustedError: Into<P::Error>,
     {
         type Error = ExhaustedError;
-        /// Recur on edges in left-to-right order, consistent with `CallStack` and `VecStack`.
-        type IndexIter = Rev<RangeIter<usize>>;
-
-        fn index_iter(end: <P::Node as Node>::Index) -> Self::IndexIter
-        {
-            RangeIter(0 .. end).rev()
-        }
 
         fn recur(
             it: &mut Equiv<P>,
-            a: P::Node,
-            b: P::Node,
+            edges_iter: EdgesIter<P::Node>,
         ) -> Result<<P::Node as Node>::Cmp, Self::Error>
         {
             if it.recur_stack.0.len() < 2_usize.pow(30) {
-                it.recur_stack.0.push_front((a, b));
+                it.recur_stack.0.push_front(edges_iter);
                 Ok(Cmp::new_equiv())
             }
             else {
@@ -162,7 +153,17 @@ mod custom_recur_stack
 
         fn next(&mut self) -> Option<(P::Node, P::Node)>
         {
-            self.0.pop_front()
+            while let Some(edges_iter) = self.0.front_mut() {
+                if let next @ Some(_) = edges_iter.next() {
+                    if edges_iter.is_empty() {
+                        // Prevent empty iterators from staying on the stack.
+                        drop(self.0.pop_front());
+                    }
+                    return next;
+                }
+                drop(self.0.pop_front());
+            }
+            None
         }
 
         fn reset(mut self) -> Self
@@ -197,10 +198,11 @@ mod other_recur_stack
         cycle_deep_safe_compare::{
             generic::equiv::{
                 self,
+                EdgesIter,
                 Equiv,
                 RecurStack,
             },
-            utils::RangeIter,
+            Cmp,
             Node,
         },
     };
@@ -221,21 +223,20 @@ mod other_recur_stack
         OtherStackError<P::Error>: Into<P::Error>,
     {
         type Error = OtherStackError<P::Error>;
-        type IndexIter = RangeIter<<P::Node as Node>::Index>;
-
-        fn index_iter(end: <P::Node as Node>::Index) -> Self::IndexIter
-        {
-            RangeIter(0 .. end)
-        }
 
         fn recur(
             it: &mut Equiv<P>,
-            a: P::Node,
-            b: P::Node,
+            edges_iter: EdgesIter<P::Node>,
         ) -> Result<<P::Node as Node>::Cmp, Self::Error>
         {
             if true {
-                it.equiv_main(&a, &b).map_err(OtherStackError::Recur)
+                for (a, b) in edges_iter {
+                    match it.equiv_main(&a, &b) {
+                        Ok(cmp) if cmp.is_equiv() => (),
+                        result => return result.map_err(OtherStackError::Recur),
+                    }
+                }
+                Ok(Cmp::new_equiv())
             }
             else {
                 Err(OtherStackError::Novel)

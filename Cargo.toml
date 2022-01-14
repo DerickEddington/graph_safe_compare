@@ -63,6 +63,12 @@ required-features = ["std"]
 name = "rc_pair"
 required-features = ["std"]
 
+[[test]]
+name = "lazy"
+required-features = ["std"]
+
+# Note: The "wide" test can still run some tests with reduced features.
+
 [profile.bench-max-optim]
 inherits = "bench"
 lto = true

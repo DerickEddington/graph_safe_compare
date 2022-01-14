@@ -66,18 +66,15 @@ pub mod recursion
                 basic::recursion::callstack::CallStack,
                 generic::equiv::{
                     self,
+                    EdgesIter,
                     Equiv,
                     RecurStack,
                 },
-                utils::RangeIter,
                 Cmp,
                 Node,
             },
             alloc::vec::Vec,
-            core::{
-                convert::Infallible,
-                iter::Rev,
-            },
+            core::convert::Infallible,
         };
 
         /// Generic parameters of [`VecStack`] and its operations.
@@ -119,7 +116,7 @@ pub mod recursion
         /// (If, instead, you want to limit how much a recursion-stack can grow, you must `impl`
         /// [`RecurStack`] for your own type that does that and use it with the
         /// [`generic`](crate::generic) API.)
-        pub struct VecStack<P: Params>(Vec<(P::Node, P::Node)>);
+        pub struct VecStack<P: Params>(Vec<EdgesIter<P::Node>>);
 
         impl<P: Params> Default for VecStack<P>
         {
@@ -151,30 +148,32 @@ pub mod recursion
             Infallible: Into<E::Error>,
         {
             type Error = Infallible;
-            /// Recur on edges in left-to-right order, consistent with [`CallStack`].
-            type IndexIter = Rev<RangeIter<<E::Node as Node>::Index>>;
-
-            #[inline]
-            fn index_iter(end: <E::Node as Node>::Index) -> Self::IndexIter
-            {
-                RangeIter(0.into() .. end).rev()
-            }
 
             #[inline]
             fn recur(
                 it: &mut Equiv<E>,
-                a: E::Node,
-                b: E::Node,
+                edges_iter: EdgesIter<E::Node>,
             ) -> Result<<E::Node as Node>::Cmp, Self::Error>
             {
-                it.recur_stack.0.push((a, b));
+                it.recur_stack.0.push(edges_iter);
                 Ok(Cmp::new_equiv())
             }
 
             #[inline]
             fn next(&mut self) -> Option<(E::Node, E::Node)>
             {
-                self.0.pop()
+                if let Some(edges_iter) = self.0.last_mut() {
+                    let next = edges_iter.next();
+                    if edges_iter.is_empty() {
+                        // Prevent empty iterators from staying on the stack.
+                        drop(self.0.pop());
+                    }
+                    debug_assert!(next.is_some());
+                    next
+                }
+                else {
+                    None
+                }
             }
 
             /// An aborted precheck, that uses `VecStack`, might have left some elements, so we

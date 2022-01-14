@@ -532,6 +532,7 @@ mod tests
             type Node = CharKeyed;
         }
 
+        #[derive(Clone)]
         struct CharKeyed;
 
         #[allow(clippy::unreachable)]

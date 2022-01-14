@@ -190,7 +190,7 @@ mod modes
         /// immediately skipped.  Called before getting any edges.
         ///
         /// Returning `true` causes all the descendents to begin to be compared, individually
-        /// under the control of [`Self::do_recur`].
+        /// under the control of [`Self::do_traverse`].
         ///
         /// Returning `false` causes all the descendents to be skipped, and assumes they are
         /// already known to satisfy equivalence with their counterparts, and causes the
@@ -206,20 +206,18 @@ mod modes
             b: &P::Node,
         ) -> Result<bool, Self::Error>;
 
-        /// Controls if individual descendent counterparts will be gotten and descended into via
-        /// recursion.  Called repeatedly when getting and comparing descendents.
+        /// Controls if each node-counterparts will be traversed.
         ///
-        /// Returning `true` causes the next counterparts to be gotten and recurred on to compare
-        /// them.
+        /// Returning `true` causes the next counterparts to be compared.
         ///
         /// Returning `false` causes them to be skipped, and assumes they are already known to
         /// satisfy equivalence, and causes the comparison traversal to immediately continue on to
-        /// the next descendent nodes.
+        /// the next nodes.
         ///
         /// # Errors
         /// Returning `Err` causes the invocation of the algorithm to abort early and immediately
         /// return the converted error.
-        fn do_recur(&mut self) -> Result<bool, Self::Error>;
+        fn do_traverse(&mut self) -> Result<bool, Self::Error>;
     }
 }
 
@@ -228,6 +226,7 @@ mod recursion
 {
     use {
         super::equiv::{
+            EdgesIter,
             Equiv,
             Params,
         },
@@ -237,18 +236,8 @@ mod recursion
     /// Abstraction of recursion continuations.
     pub trait RecurStack<P: Params>: Default
     {
-        /// Determines the order that edge indices are processed.
-        ///
-        /// Affects the order that edges are recurred on, which affects the consistency of
-        /// three-or-more-way comparison results when different [`RecurStack`] types are used.
-        type IndexIter: Iterator<Item = <P::Node as Node>::Index>;
-
         /// Type of error that can occur.
         type Error: Into<P::Error>;
-
-        /// Create a fresh [`Iterator`] that yields each [`Index`](Node::Index) in the range
-        /// `0.into() .. end`, once, in some desired order.
-        fn index_iter(end: <P::Node as Node>::Index) -> Self::IndexIter;
 
         /// Arrange for the given nodes to be recurred on, either immediately or later.
         ///
@@ -267,8 +256,7 @@ mod recursion
         /// return the converted error.
         fn recur(
             it: &mut Equiv<P>,
-            a: P::Node,
-            b: P::Node,
+            edges_iter: EdgesIter<P::Node>,
         ) -> Result<<P::Node as Node>::Cmp, Self::Error>;
 
         /// Supply the next counterpart nodes for the algorithm to compare, if any were saved for
@@ -297,6 +285,7 @@ pub mod equiv
 {
     use {
         crate::{
+            utils::RangeIter,
             Cmp,
             Node,
         },
@@ -394,7 +383,6 @@ pub mod equiv
         }
     }
 
-
     /// The primary logic of the algorithm.
     ///
     /// This generic design works with the [`Node`], [`DescendMode`], and [`RecurStack`] traits to
@@ -479,22 +467,63 @@ pub mod equiv
             // branches should be eliminated by the optimizer.  For the other methods, inlining
             // should be doable by the optimizer.
 
-            if a.id() != b.id() {
+            if try_into!(self.descend_mode.do_traverse()) && a.id() != b.id() {
                 let amount_edges = try_cmp!(a.equiv_modulo_descendents_then_amount_edges(b));
                 if amount_edges > 0.into() && try_into!(self.descend_mode.do_edges(a, b)) {
-                    for i in P::RecurStack::index_iter(amount_edges) {
-                        if try_into!(self.descend_mode.do_recur()) {
-                            let (ae, be) = (a.get_edge(&i), b.get_edge(&i));
-                            let cmp = try_into!(P::RecurStack::recur(self, ae, be));
-                            if !cmp.is_equiv() {
-                                return Ok(cmp);
-                            }
-                        }
-                    }
+                    let edges_iter = EdgesIter::new(amount_edges, (a.clone(), b.clone()));
+                    return P::RecurStack::recur(self, edges_iter).map_err(Into::into);
                 }
             }
 
             Ok(Cmp::new_equiv())
+        }
+    }
+
+    /// Get edges lazily, in increasing-index order.
+    ///
+    /// Enables avoiding consuming excessive space for `RecurStack` types like `VecStack`.
+    pub struct EdgesIter<N: Node>
+    {
+        counterparts: (N, N),
+        index_iter:   RangeIter<N::Index>,
+    }
+
+    impl<N: Node> EdgesIter<N>
+    {
+        /// Prepare to get `amount` edges from `counterparts`.
+        #[inline]
+        pub fn new(
+            amount: N::Index,
+            counterparts: (N, N),
+        ) -> Self
+        {
+            Self { counterparts, index_iter: RangeIter(0.into() .. amount) }
+        }
+
+        /// Returns `true` if the iterator is empty.
+        ///
+        /// (This type does not `impl` `ExactSizeIterator` because that would impose more
+        /// requirements than needed.  Does not use `Range::is_empty` because that is not
+        /// `#[inline]`.)
+        #[inline]
+        pub fn is_empty(&self) -> bool
+        {
+            let range = &self.index_iter.0;
+            range.start >= range.end
+        }
+    }
+
+    impl<N: Node> Iterator for EdgesIter<N>
+    {
+        type Item = (N, N);
+
+        #[inline]
+        fn next(&mut self) -> Option<Self::Item>
+        {
+            self.index_iter.next().map(|i| {
+                let (a, b) = &self.counterparts;
+                (a.get_edge(&i), b.get_edge(&i))
+            })
         }
     }
 }

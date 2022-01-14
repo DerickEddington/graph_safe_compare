@@ -33,7 +33,7 @@ use {
 
 
 /// New type needed so we can impl the `Node` and `PartialEq` traits on it.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct My(Datum);
 
 impl PartialEq for My

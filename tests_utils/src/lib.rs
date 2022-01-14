@@ -15,6 +15,8 @@ pub mod node_types
     pub mod dyn_pair;
     pub mod diff_edge;
     pub mod diff_index;
+    pub mod wide;
+    pub mod lazy;
 }
 
 pub mod shapes;
@@ -56,5 +58,12 @@ pub mod sizes
         const DEFAULT: u32 = if cfg!(debug_assertions) { 28 } else { 33 };
 
         get_env_var("MY_TEST_DEGENERATE_DEPTH", DEFAULT)
+    }
+
+    pub fn great_width() -> u32
+    {
+        const DEFAULT: u32 = if cfg!(debug_assertions) { 100_000_000 } else { 1_000_000_000 };
+
+        get_env_var("MY_TEST_GREAT_WIDTH", DEFAULT)
     }
 }
