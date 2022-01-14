@@ -1,15 +1,12 @@
 use {
     cycle_deep_safe_compare::Node,
     std::any::Any,
-    tests_utils::{
-        node_types::dyn_pair::{
-            Datum1,
-            Datum2,
-            DatumAllocator,
-            DatumRef,
-            DowncastDatum,
-        },
-        shapes::Leaf,
+    tests_utils::node_types::dyn_pair::{
+        Datum1,
+        Datum2,
+        DatumAllocator,
+        DatumRef,
+        DowncastDatum,
     },
 };
 

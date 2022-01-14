@@ -4,12 +4,9 @@ pub use {
         cmp::Ordering,
         rc::Rc,
     },
-    tests_utils::{
-        node_types::rc_pair::{
-            Datum,
-            DatumAllocator,
-        },
-        shapes::Leaf,
+    tests_utils::node_types::rc_pair::{
+        Datum,
+        DatumAllocator,
     },
 };
 

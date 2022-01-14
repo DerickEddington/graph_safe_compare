@@ -183,6 +183,8 @@ macro_rules! eq_variation_mod_body {
         #[test]
         fn rudimentary()
         {
+            use $crate::shapes::Leaf;
+
             let alloc1 = $alloc_trans($make_alloc(1));
             let alloc2 = $alloc_trans($make_alloc(1));
             let leaf1 = Leaf::new_in(&alloc1);
