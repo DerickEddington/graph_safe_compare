@@ -163,15 +163,8 @@ pub mod modes
             rng:           P::RNG,
         }
 
-        #[allow(clippy::as_conversions, clippy::integer_division)]
         impl<P: Params> Interleave<P>
         {
-            /// How many additional leaf nodes may be traversed, after the "slow" phase limit was
-            /// exceeded, and still reset to "fast" phase.  If this is reached, reset to "slow"
-            /// phase instead, because fast traversal of leaf nodes was already just done for a
-            /// period.
-            pub const BELOW_SLOW_LIMIT: i32 =
-                Self::SLOW_LIMIT_NEG - ((P::FAST_LIMIT_MAX / 4) as i32);
             /// Exclusive end of range, derived from
             /// [`P::FAST_LIMIT_MAX`](Params::FAST_LIMIT_MAX).
             pub const FAST_LIMIT_MAX_RANGE_END: NonZeroU16 =
@@ -181,6 +174,7 @@ pub mod modes
                     None => panic!(),
                 };
             /// Negated [`P::SLOW_LIMIT`](Params::SLOW_LIMIT).
+            #[allow(clippy::as_conversions)]
             pub const SLOW_LIMIT_NEG: i32 = -(P::SLOW_LIMIT as i32);
         }
 
@@ -217,18 +211,19 @@ pub mod modes
                 b: &E::Node,
             ) -> Result<bool, Self::Error>
             {
+                // Only decrement the ticker for branch nodes.
+                self.ticker = self.ticker.saturating_sub(1);
+
                 // "fast" phase
                 let r = if self.ticker >= 0 {
                     true
                 }
                 // "slow" limit reached, change to "fast" phase
-                else if self.ticker < Self::SLOW_LIMIT_NEG
-                // When `ticker <= BELOW_SLOW_LIMIT`, that means leaf nodes (possibly many) were
-                // traversed without calling this method, which was fast, and so "slow" phase
-                // should now be done (this is critical for balancing performance for both
-                // very-wide degenerate and very-long narrow leafy shapes).
-                    && Self::BELOW_SLOW_LIMIT < self.ticker
-                {
+                else if self.ticker < Self::SLOW_LIMIT_NEG {
+                    debug_assert_eq!(
+                        (self.ticker, false),
+                        Self::SLOW_LIMIT_NEG.overflowing_sub(1)
+                    );
                     // Random limits for "fast" "reduce the likelihood of repeatedly tripping on
                     // worst-case behavior in cases where the sizes of the input graphs happen to
                     // be related to the chosen bounds in a bad way".
@@ -252,12 +247,10 @@ pub mod modes
                 Ok(r)
             }
 
-            /// Decrement the ticker before [`Self::do_edges`] is called, and traverse nodes
-            /// without limit.
+            /// Always traverse nodes, without limit.
             #[inline]
             fn do_traverse(&mut self) -> Result<bool, Self::Error>
             {
-                self.ticker = self.ticker.saturating_sub(1);
                 Ok(true)
             }
         }
