@@ -155,6 +155,7 @@ pub mod recursion
                 edges_iter: EdgesIter<E::Node>,
             ) -> Result<<E::Node as Node>::Cmp, Self::Error>
             {
+                debug_assert!(!edges_iter.is_empty());
                 it.recur_stack.0.push(edges_iter);
                 Ok(Cmp::new_equiv())
             }
