@@ -11,7 +11,7 @@ use {
 };
 
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 struct My(Rc<Datum>);
 
 impl My
@@ -123,7 +123,7 @@ macro_rules! variation_tests {
                 b: My,
             ) -> bool
             {
-                cycle_deep_safe_compare::$name::equiv(&a, &b)
+                cycle_deep_safe_compare::$name::equiv(a, b)
             }
 
             macro_rules! assert_equiv {

@@ -114,8 +114,8 @@ impl Node for &Datum
 
 macro_rules! case {
     ($a:expr, $b:expr => $r:expr) => {{
-        let a: &&Datum = &&$a;
-        let b: &&Datum = &&$b;
+        let a: &Datum = &$a;
+        let b: &Datum = &$b;
         let r: Ordering = $r;
 
         #[cfg(feature = "std")]
@@ -357,7 +357,7 @@ fn sorting()
         b: &Datum,
     ) -> Ordering
     {
-        case!(*a, *b => basic::equiv(&a, &b))
+        case!(*a, *b => basic::equiv(a, b))
     }
 
     macro_rules! sort_case {

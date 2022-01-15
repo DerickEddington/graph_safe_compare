@@ -13,7 +13,7 @@ use {
 };
 
 
-#[derive(Clone, Debug)]
+#[derive(Copy, Clone, Debug)]
 struct My<'l>(&'l Datum<'l>);
 
 impl<'l> Node for My<'l>

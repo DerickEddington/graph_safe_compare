@@ -151,11 +151,11 @@ mod premade
         /// a [`P::Error`](Params::Error) that represents the error.
         #[inline]
         pub fn equiv<N, P>(
-            a: &N,
-            b: &N,
+            a: N,
+            b: N,
         ) -> Result<N::Cmp, P::Error>
         where
-            N: Node,
+            N: Node + Clone,
             P: Params<N>,
         {
             use interleave::Params as _;
@@ -163,7 +163,7 @@ mod premade
             let mut e =
                 Equiv::<PrecheckArgs<N, P>>::new(Limited(P::InterleaveParams::PRECHECK_LIMIT));
 
-            match e.equiv(a, b) {
+            match e.equiv(a.clone(), b.clone()) {
                 Ok(cmp) => Ok(cmp),
                 Err(PrecheckError::RecurError(e)) => Err(e),
                 Err(PrecheckError::LimitReached) => {
@@ -283,18 +283,14 @@ mod recursion
 /// The central parts of the algorithm.
 pub mod equiv
 {
-    use {
-        crate::{
-            utils::RangeIter,
-            Cmp,
-            Node,
-        },
-        core::borrow::Borrow,
-    };
-
     pub use super::{
         modes::DescendMode,
         recursion::RecurStack,
+    };
+    use crate::{
+        utils::RangeIter,
+        Cmp,
+        Node,
     };
 
     /// Generic parameters of [`Equiv`] and its operations.
@@ -398,28 +394,23 @@ pub mod equiv
         /// If a [`DescendMode`] or [`RecurStack`] method gives an error, returns that error
         /// converted.
         #[inline]
-        pub fn equiv<T: Borrow<P::Node>>(
+        pub fn equiv(
             &mut self,
-            ai: T,
-            bi: T,
+            mut a: P::Node,
+            mut b: P::Node,
         ) -> Result<<P::Node as Node>::Cmp, P::Error>
         {
-            let (mut ar, mut br) = (ai.borrow(), bi.borrow());
-            let (mut ao, mut bo);
-
             // This loop, when used in conjunction with certain `RecurStack::recur` and
             // `RecurStack::next` implementations, is what prevents growing the call-stack, and so
             // prevents the possibility of stack overflow, when traversing descendents.  For other
             // implementations where the `RecurStack::recur` does grow the call-stack, the
             // `RecurStack::next` always returns `None` and so this loop should be optimized away.
             loop {
-                match self.equiv_main(ar, br) {
+                match self.equiv_main(a, b) {
                     Ok(cmp) if cmp.is_equiv() => match self.recur_stack.next() {
                         Some((an, bn)) => {
-                            ao = an;
-                            bo = bn;
-                            ar = &ao;
-                            br = &bo;
+                            a = an;
+                            b = bn;
                         },
                         None => return Ok(cmp),
                     },
@@ -440,8 +431,8 @@ pub mod equiv
         #[inline]
         pub fn equiv_main(
             &mut self,
-            a: &P::Node,
-            b: &P::Node,
+            a: P::Node,
+            b: P::Node,
         ) -> Result<<P::Node as Node>::Cmp, P::Error>
         {
             macro_rules! try_ret {
@@ -468,9 +459,9 @@ pub mod equiv
             // should be doable by the optimizer.
 
             if try_into!(self.descend_mode.do_traverse()) && a.id() != b.id() {
-                let amount_edges = try_cmp!(a.equiv_modulo_descendents_then_amount_edges(b));
-                if amount_edges > 0.into() && try_into!(self.descend_mode.do_edges(a, b)) {
-                    let edges_iter = EdgesIter::new(amount_edges, (a.clone(), b.clone()));
+                let amount_edges = try_cmp!(a.equiv_modulo_descendents_then_amount_edges(&b));
+                if amount_edges > 0.into() && try_into!(self.descend_mode.do_edges(&a, &b)) {
+                    let edges_iter = EdgesIter::new(amount_edges, (a, b));
                     return P::RecurStack::recur(self, edges_iter).map_err(Into::into);
                 }
             }

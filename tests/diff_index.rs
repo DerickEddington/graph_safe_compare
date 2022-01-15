@@ -66,9 +66,9 @@ impl PartialEq for My
                 type Table = hash_map::Table<Self>;
             }
 
-            precheck_interleave::equiv::<_, Args>(self, other).into_ok()
+            precheck_interleave::equiv::<_, Args>(self.clone(), other.clone()).into_ok()
         };
-        let robust = robust::precheck_equiv(self, other);
+        let robust = robust::precheck_equiv(self.clone(), other.clone());
         assert_eq!(callstack, robust);
         callstack
     }

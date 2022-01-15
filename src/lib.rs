@@ -99,7 +99,7 @@ use core::{
 
 
 /// What the algorithm requires from a type, to be applied to it.
-pub trait Node: Clone
+pub trait Node
 {
     /// Result of comparing nodes.  Common choices are [`bool`] or [`Ordering`], but it may be
     /// anything that satisfies the trait bounds.

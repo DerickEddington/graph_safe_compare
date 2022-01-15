@@ -154,7 +154,7 @@ macro_rules! variation_benches {
             {
                 let [input1, input2] = new_inputs();
                 $($(let $var = $arg;)*)?
-                let f = || $name::$func($($($var,)*)? &input1.head, &input2.head);
+                let f = || $name::$func($($($var,)*)? input1.head.clone(), input2.head.clone());
 
                 // Check that they are equivalent as expected.
                 assert!(IntoBool::into_bool(f()));
@@ -284,8 +284,8 @@ mod extra
         };
 
         pub fn eq(
-            a: &My,
-            b: &My,
+            a: My,
+            b: My,
         ) -> bool
         {
             let a: &Datum = &*a.0;

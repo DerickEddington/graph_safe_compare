@@ -175,7 +175,7 @@ macro_rules! eq_variation_mod_body {
                 other: &Self,
             ) -> bool
             {
-                let cmp = $algo_func(&self.0, &other.0);
+                let cmp = $algo_func(self.0.clone(), other.0.clone());
                 cmp.is_equiv()
             }
         }
@@ -251,8 +251,8 @@ macro_rules! eq_variations_tests
             }
 
             fn limited_equiv<N: cycle_deep_safe_compare::Node>(
-                a: &N,
-                b: &N,
+                a: N,
+                b: N,
             ) -> bool
             {
                 use cycle_deep_safe_compare::Cmp as _;
@@ -349,9 +349,9 @@ macro_rules! eq_variations_tests
             /// Use the call-stack for the precheck since that is limited and will not overflow
             /// the stack when the stack is already shallow, and use the vector-stack for the
             /// interleave so great depth is supported since an input could be very-deep.
-            fn precheck_interleave_equiv<N: cycle_deep_safe_compare::Node>(
-                a: &N,
-                b: &N,
+            fn precheck_interleave_equiv<N: cycle_deep_safe_compare::Node + Clone>(
+                a: N,
+                b: N,
             ) -> bool
             {
                 use {

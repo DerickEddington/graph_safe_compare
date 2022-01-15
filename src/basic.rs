@@ -37,8 +37,8 @@ mod premade
     /// having different behavior than derived `PartialEq`.
     #[inline]
     pub fn equiv<N: Node>(
-        a: &N,
-        b: &N,
+        a: N,
+        b: N,
     ) -> N::Cmp
     {
         struct Args<N>(PhantomData<N>);
@@ -65,8 +65,8 @@ mod premade
     #[inline]
     pub fn limited_equiv<N: Node, L: Ticker>(
         limit: L,
-        a: &N,
-        b: &N,
+        a: N,
+        b: N,
     ) -> Result<N::Cmp, LimitReached>
     {
         struct Args<N, L>(PhantomData<(N, L)>);
@@ -122,7 +122,7 @@ pub mod recursion
             ) -> Result<<P::Node as Node>::Cmp, Self::Error>
             {
                 for (a, b) in edges_iter {
-                    match it.equiv_main(&a, &b) {
+                    match it.equiv_main(a, b) {
                         Ok(cmp) if cmp.is_equiv() => (),
                         result => return result,
                     }

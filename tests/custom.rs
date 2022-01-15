@@ -231,7 +231,7 @@ mod other_recur_stack
         {
             if true {
                 for (a, b) in edges_iter {
-                    match it.equiv_main(&a, &b) {
+                    match it.equiv_main(a, b) {
                         Ok(cmp) if cmp.is_equiv() => (),
                         result => return result.map_err(OtherStackError::Recur),
                     }
@@ -281,8 +281,8 @@ mod custom_rng
 
 /// Use our custom `Table`, `Rc`, `RecurStack`, and `NumberGenerator` types.
 fn custom_equiv(
-    a: &My,
-    b: &My,
+    a: My,
+    b: My,
 ) -> bool
 {
     use {
@@ -359,7 +359,7 @@ fn custom_equiv(
             type PrecheckRecurStack = OtherStack;
         }
 
-        precheck_interleave::equiv::<_, Args>(a, b).unwrap()
+        precheck_interleave::equiv::<_, Args>(a.clone(), b.clone()).unwrap()
     };
 
     // Exercise our list-stack for the precheck.

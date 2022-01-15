@@ -25,8 +25,8 @@ mod premade
     /// Equivalence predicate that can handle very-deep graphs but not cyclic graphs.
     #[inline]
     pub fn equiv<N: Node>(
-        a: &N,
-        b: &N,
+        a: N,
+        b: N,
     ) -> N::Cmp
     {
         struct Args<N>(PhantomData<N>);

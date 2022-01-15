@@ -50,8 +50,8 @@ impl<N: Node> vecstack::Params for Args<N>
 /// Equivalence predicate that can handle cyclic graphs and very-deep graphs.
 #[inline]
 pub fn equiv<N: Node>(
-    a: &N,
-    b: &N,
+    a: N,
+    b: N,
 ) -> N::Cmp
 {
     impl<N: Node> equiv::Params for Args<N>
@@ -69,9 +69,9 @@ pub fn equiv<N: Node>(
 
 /// Like [`equiv`](equiv()) but first tries the precheck that is faster for small acyclic graphs.
 #[inline]
-pub fn precheck_equiv<N: Node>(
-    a: &N,
-    b: &N,
+pub fn precheck_equiv<N: Node + Clone>(
+    a: N,
+    b: N,
 ) -> N::Cmp
 {
     impl<N: Node> precheck_interleave::Params<N> for Args<N>
