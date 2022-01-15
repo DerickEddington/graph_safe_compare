@@ -57,6 +57,7 @@
     clippy::implicit_return,
     clippy::blanket_clippy_restriction_lints,
     clippy::default_numeric_fallback,
+    clippy::separated_literal_suffix,
     clippy::missing_docs_in_private_items,
     clippy::pattern_type_mismatch,
     clippy::shadow_reuse
