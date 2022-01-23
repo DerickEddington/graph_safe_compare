@@ -25,17 +25,18 @@ use {
 };
 
 
+#[derive(Copy, Clone)]
 pub struct It(i32);
 
 impl Node for It
 {
     type Cmp = Ordering;
-    type Id = *const Self;
+    type Id = i32;
     type Index = u8;
 
     fn id(&self) -> Self::Id
     {
-        self
+        self.0
     }
 
     fn amount_edges(&self) -> Self::Index
@@ -72,7 +73,7 @@ impl PartialEq for It
         other: &Self,
     ) -> bool
     {
-        equiv(self, other).is_eq()
+        equiv(*self, *other).is_eq()
     }
 }
 impl Eq for It {}

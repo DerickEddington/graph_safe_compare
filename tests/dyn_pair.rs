@@ -1,6 +1,13 @@
 use {
-    cycle_deep_safe_compare::Node,
-    std::any::Any,
+    cycle_deep_safe_compare::{
+        utils::RefId,
+        Node,
+    },
+    std::{
+        any::Any,
+        cell::RefCell,
+        rc::Rc,
+    },
     tests_utils::node_types::dyn_pair::{
         Datum1,
         Datum2,
@@ -17,12 +24,12 @@ struct My(DatumRef);
 impl Node for My
 {
     type Cmp = bool;
-    type Id = *const dyn Any;
+    type Id = RefId<Rc<RefCell<dyn Any>>>;
     type Index = usize;
 
     fn id(&self) -> Self::Id
     {
-        &*self.0.0.borrow()
+        RefId(Rc::clone(&self.0.0))
     }
 
     fn amount_edges(&self) -> Self::Index

@@ -1,9 +1,9 @@
 use {
-    cycle_deep_safe_compare::Node,
-    std::{
-        convert::identity,
-        rc::Rc,
+    cycle_deep_safe_compare::{
+        utils::RefId,
+        Node,
     },
+    std::convert::identity,
     tests_utils::{
         node_types::wide::Datum,
         sizes::great_width,
@@ -12,39 +12,25 @@ use {
 
 
 #[derive(Debug)]
-struct My(Rc<Datum>);
+struct My<'l>(&'l Datum);
 
-impl My
+impl<'l> From<My<'l>> for &'l Datum
 {
-    fn new(depth: u32) -> Self
+    fn from(my: My<'l>) -> Self
     {
-        let width = f64::from(great_width()).powf(1.0 / f64::from(depth)).round() as usize;
-        Self(Rc::new(Datum::degenerate_chain(width, depth)))
-    }
-
-    fn new_couple(depth: u32) -> (Self, Self)
-    {
-        (Self::new(depth), Self::new(depth))
+        my.0
     }
 }
 
-impl From<My> for Datum
-{
-    fn from(my: My) -> Self
-    {
-        Rc::try_unwrap(my.0).unwrap()
-    }
-}
-
-impl Node for My
+impl<'l> Node for My<'l>
 {
     type Cmp = bool;
-    type Id = *const Datum;
+    type Id = RefId<&'l Datum>;
     type Index = usize;
 
     fn id(&self) -> Self::Id
     {
-        &*self.0
+        RefId(self.0)
     }
 
     fn amount_edges(&self) -> Self::Index
@@ -57,7 +43,7 @@ impl Node for My
         index: &Self::Index,
     ) -> Self
     {
-        My(Rc::clone(&self.0[*index]))
+        My(&self.0[*index])
     }
 
     fn equiv_modulo_edges(
@@ -70,9 +56,21 @@ impl Node for My
 }
 
 
+fn new(depth: u32) -> Datum
+{
+    let width = f64::from(great_width()).powf(1.0 / f64::from(depth)).round() as usize;
+    Datum::degenerate_chain(width, depth)
+}
+
+fn new_couple(depth: u32) -> (Datum, Datum)
+{
+    (new(depth), new(depth))
+}
+
 macro_rules! case {
     ($depth:expr, $conv:expr, $assert_cmp:ident) => {{
-        let (a, b) = My::new_couple($depth);
+        let (a, b) = new_couple($depth);
+        let (a, b) = (My(&a), My(&b));
         let conv = $conv;
         $assert_cmp!(conv(a), conv(b));
     }};
@@ -149,5 +147,5 @@ mod derived_eq
 {
     use super::*;
 
-    depth_tests!(Into::<Datum>::into, assert_eq);
+    depth_tests!(Into::<&Datum>::into, assert_eq);
 }

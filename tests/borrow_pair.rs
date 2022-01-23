@@ -4,7 +4,10 @@
 #![allow(clippy::drop_copy)]
 
 use {
-    cycle_deep_safe_compare::Node,
+    cycle_deep_safe_compare::{
+        utils::RefId,
+        Node,
+    },
     tests_utils::node_types::borrow_pair::{
         Datum,
         DatumAllocator,
@@ -19,12 +22,12 @@ struct My<'l>(&'l Datum<'l>);
 impl<'l> Node for My<'l>
 {
     type Cmp = bool;
-    type Id = *const Datum<'l>;
+    type Id = RefId<&'l Datum<'l>>;
     type Index = u32;
 
     fn id(&self) -> Self::Id
     {
-        self.0
+        RefId(self.0)
     }
 
     fn amount_edges(&self) -> Self::Index

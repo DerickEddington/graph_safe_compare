@@ -1,3 +1,4 @@
+use cycle_deep_safe_compare::utils::RefId;
 pub use {
     cycle_deep_safe_compare::Node,
     std::{
@@ -17,12 +18,12 @@ pub struct My(pub Rc<Datum>);
 impl Node for My
 {
     type Cmp = Ordering;
-    type Id = *const Datum;
+    type Id = RefId<Rc<Datum>>;
     type Index = usize;
 
     fn id(&self) -> Self::Id
     {
-        &*self.0
+        RefId(Rc::clone(&self.0))
     }
 
     fn amount_edges(&self) -> Self::Index

@@ -1,5 +1,8 @@
 use {
-    cycle_deep_safe_compare::Node,
+    cycle_deep_safe_compare::{
+        utils::RefId,
+        Node,
+    },
     std::{
         cell::RefCell,
         rc::Rc,
@@ -43,18 +46,26 @@ pub struct My2(Rc<Datum2>);
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct My3(Rc<Datum3>);
 
+#[derive(Clone, Hash, Eq, PartialEq)]
+pub enum Id
+{
+    Id1(RefId<Rc<Datum1>>),
+    Id2(RefId<Rc<Datum2>>),
+    Id3(RefId<Rc<Datum3>>),
+}
+
 impl Node for My
 {
     type Cmp = bool;
-    type Id = *const ();
+    type Id = Id;
     type Index = u16;
 
     fn id(&self) -> Self::Id
     {
         match self {
-            My(Kind::A(a)) => a.id() as _,
-            My(Kind::B(b)) => b.id() as _,
-            My(Kind::C(c)) => c.id() as _,
+            My(Kind::A(a)) => Id::Id1(a.id()),
+            My(Kind::B(b)) => Id::Id2(b.id()),
+            My(Kind::C(c)) => Id::Id3(c.id()),
         }
     }
 
@@ -95,9 +106,9 @@ impl Node for My
 
 impl My1
 {
-    fn id(&self) -> *const Datum1
+    fn id(&self) -> RefId<Rc<Datum1>>
     {
-        &*self.0
+        RefId(Rc::clone(&self.0))
     }
 
     fn amount_edges(&self) -> u16
@@ -130,9 +141,9 @@ impl My1
 
 impl My2
 {
-    fn id(&self) -> *const Datum2
+    fn id(&self) -> RefId<Rc<Datum2>>
     {
-        &*self.0
+        RefId(Rc::clone(&self.0))
     }
 
     fn amount_edges(&self) -> u16
@@ -175,9 +186,9 @@ impl My2
 
 impl My3
 {
-    fn id(&self) -> *const Datum3
+    fn id(&self) -> RefId<Rc<Datum3>>
     {
-        &*self.0
+        RefId(Rc::clone(&self.0))
     }
 
     fn amount_edges(&self) -> u16

@@ -8,6 +8,7 @@ use cycle_deep_safe_compare::{
 use {
     cycle_deep_safe_compare::{
         basic,
+        utils::RefId,
         Node,
     },
     std::cmp::Ordering,
@@ -26,15 +27,15 @@ enum Datum
     E(Vec<Self>),
 }
 
-impl Node for &Datum
+impl<'l> Node for &'l Datum
 {
     type Cmp = Ordering;
-    type Id = *const Datum;
+    type Id = RefId<&'l Datum>;
     type Index = usize;
 
     fn id(&self) -> Self::Id
     {
-        *self
+        RefId(*self)
     }
 
     fn amount_edges(&self) -> Self::Index

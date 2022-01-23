@@ -283,6 +283,7 @@ mod tests
                 self,
                 Equiv,
             },
+            utils::RefId,
             Node,
         },
         alloc::boxed::Box,
@@ -313,15 +314,15 @@ mod tests
         pair(leaf(), leaf())
     }
 
-    impl Node for &Datum
+    impl<'l> Node for &'l Datum
     {
         type Cmp = bool;
-        type Id = *const Datum;
+        type Id = RefId<&'l Datum>;
         type Index = u8;
 
         fn id(&self) -> Self::Id
         {
-            *self
+            RefId(*self)
         }
 
         fn amount_edges(&self) -> Self::Index

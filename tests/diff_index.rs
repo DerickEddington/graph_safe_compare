@@ -10,7 +10,10 @@ use {
             precheck_interleave,
         },
         robust,
-        utils::IntoOk as _,
+        utils::{
+            IntoOk as _,
+            RefId,
+        },
         Node,
     },
     std::{
@@ -19,6 +22,7 @@ use {
             identity,
             Infallible,
         },
+        rc::Rc,
     },
     tests_utils::{
         node_types::diff_index::{
@@ -77,12 +81,12 @@ impl PartialEq for My
 impl Node for My
 {
     type Cmp = bool;
-    type Id = (Index, *const [RefCell<Inner>]);
+    type Id = (Index, RefId<Rc<[RefCell<Inner>]>>);
     type Index = Index;
 
     fn id(&self) -> Self::Id
     {
-        (self.0.index, &*self.0.region)
+        (self.0.index, RefId(Rc::clone(&self.0.region)))
     }
 
     fn amount_edges(&self) -> Self::Index

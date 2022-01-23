@@ -100,6 +100,9 @@ use core::{
 
 
 /// What the algorithm requires from a type, to be applied to it.
+///
+/// The `Self` type is passed by owned value because that simplifies this crate.  It is possible,
+/// and sometimes recommended, to `impl` this trait on reference types (e.g. `&N`, `Rc<N>`, etc.)
 pub trait Node
 {
     /// Result of comparing nodes.  Common choices are [`bool`] or [`Ordering`], but it may be
@@ -118,17 +121,14 @@ pub trait Node
     /// on this type should be small and very cheap.
     ///
     /// For types where only nodes that are the same object in memory can be considered identical,
-    /// pointer/address equality and hashing should be used by defining this type to be `*const T`
-    /// where `T` is either `Self` or the primary inner type.  Such pointers are never
-    /// dereferenced, and so there is no `unsafe` usage.  (Unfortunately, trying to use `&T` would
-    /// cause too many difficulties with lifetimes.  Using `*const T` is valid for the algorithm
-    /// because the lifetimes of the `&Self` borrows for the entry-point function calls outlive
-    /// such pointers used internally, and so the `Self` objects cannot move during those
-    /// lifetimes and so the pointers remain valid.)
+    /// pointer equality and hashing should be used by defining this type to be
+    /// [`RefId<T>`](crate::utils::RefId) where `T` is some reference type to the primary inner
+    /// object type and must not be a reference or pointer to the `Self` type.  The `Self` values
+    /// are moved around during the algorithm, and so references or pointers to them would be
+    /// invalid as identifiers (because they would not be unique nor consistent).
     ///
-    /// For other types where different `Self` objects can represent the same identical node, some
-    /// approach following that should be provided, and the pointer/address approach should not be
-    /// used.
+    /// For other types where separate objects can represent the same identical node, some
+    /// approach following that should be provided, and `RefId` should not be used.
     type Id: Eq + Hash + Clone;
 
     /// Determines what is used to index descendent nodes and to represent the amount of them.

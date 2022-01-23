@@ -12,6 +12,7 @@ mod my
         Node,
     };
 
+    #[derive(Copy, Clone)]
     pub struct My;
 
     impl Node for My
@@ -56,7 +57,7 @@ mod my
             other: &Self,
         ) -> bool
         {
-            equiv(self, other)
+            equiv(*self, *other)
         }
     }
     impl Eq for My {}
