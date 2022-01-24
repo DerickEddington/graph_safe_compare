@@ -27,7 +27,7 @@ impl<'l> Node for My<'l>
 
     fn amount_edges(&self) -> Self::Index
     {
-        match &*self.0.0.borrow() {
+        match self.0.0.get() {
             Inner::Leaf => 0,
             Inner::Pair(_, _) => 2,
         }
@@ -38,7 +38,7 @@ impl<'l> Node for My<'l>
         idx: &Self::Index,
     ) -> Self
     {
-        match (idx, &*self.0.0.borrow()) {
+        match (idx, self.0.0.get()) {
             (0, Inner::Pair(a, _)) => My(a),
             (1, Inner::Pair(_, b)) => My(b),
             _ => panic!("invalid"),

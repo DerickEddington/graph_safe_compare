@@ -4,10 +4,7 @@ use {
         Leaf,
         Pair,
     },
-    std::cell::{
-        Cell,
-        RefCell,
-    },
+    std::cell::Cell,
 };
 
 
@@ -16,9 +13,9 @@ use {
 // `cycle_deep_safe_compare` algorithms are tested against this type, their functions must be
 // called directly.
 #[derive(PartialEq, Eq, Default, Debug)]
-pub struct Datum<'l>(pub RefCell<Inner<'l>>);
+pub struct Datum<'l>(pub Cell<Inner<'l>>);
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Inner<'l>
 {
     Leaf,
@@ -40,7 +37,7 @@ impl<'l> Leaf for &'l Datum<'l>
     fn new_in(alloc: &Self::Alloc) -> Self
     {
         let datum_ref = alloc.alloc();
-        *datum_ref.0.borrow_mut() = Inner::Leaf;
+        datum_ref.0.set(Inner::Leaf);
         datum_ref
     }
 }
@@ -53,7 +50,7 @@ impl<'l> Pair for &'l Datum<'l>
         b: Self,
     )
     {
-        *self.0.borrow_mut() = Inner::Pair(a, b);
+        self.0.set(Inner::Pair(a, b));
     }
 
     fn take(&self) -> Option<(Self, Self)>
