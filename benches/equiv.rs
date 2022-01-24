@@ -11,14 +11,13 @@ mod inputs
 
     use {
         super::common::{
-            defaults::*,
-            rc_pair::{
+            borrow_pair::{
                 Datum,
                 DatumAllocator,
                 My,
             },
+            defaults::*,
         },
-        std::rc::Rc,
         tests_utils::shapes::PairChainMaker,
     };
 
@@ -53,22 +52,24 @@ mod inputs
     /// Shallow enough that "precheck" completes, when involved.
     const SHORT_DEGENERATE_DEPTH: u32 = log2(PRECHECK_LIMIT + 2) - 1;
 
-    pub struct Input
+    pub struct Input<'l>
     {
-        pub head: My,
-        pub tail: My,
+        pub head: My<'l>,
+        pub tail: My<'l>,
     }
 
-    type PairChainMakerMethod =
-        fn(PairChainMaker<DatumAllocator, Rc<Datum>>) -> (Rc<Datum>, Rc<Datum>);
+    type PairChainMakerMethod<'l> = fn(
+        PairChainMaker<&'l DatumAllocator<Datum<'l>>, &'l Datum<'l>>,
+    ) -> (&'l Datum<'l>, &'l Datum<'l>);
 
-    fn new_inputs(
-        method: PairChainMakerMethod,
+    fn new_inputs<'l>(
+        method: PairChainMakerMethod<'l>,
         depth: u32,
-    ) -> [Input; 2]
+        alloc: &'l DatumAllocator<Datum<'l>>,
+    ) -> [Input<'l>; 2]
     {
         let new_input = || {
-            let maker = PairChainMaker::new_with(depth, DatumAllocator::default());
+            let maker = PairChainMaker::new_with(depth, alloc);
             let (head, tail) = method(maker);
             Input { head: My(head), tail: My(tail) }
         };
@@ -76,35 +77,51 @@ mod inputs
         [new_input(), new_input()]
     }
 
+    fn list_size(depth: u32) -> u32
+    {
+        2 * depth + 1
+    }
+
+    fn degenerate_size(depth: u32) -> u32
+    {
+        depth + 1
+    }
+
     macro_rules! shape {
-        ($name:ident, $make:ident) => {
-            shape! { $name, $name, $make }
+        ($name:ident, $depth:expr, $size:ident) => {
+            shape! { $name, $name, $depth, $size }
         };
-        ($name:ident, $make:ident, $depth:expr) => {
+        ($name:ident, $make:ident, $depth:expr, $size:ident) => {
             pub mod $name
             {
                 use super::*;
 
-                pub fn new_inputs() -> [Input; 2]
+                pub fn alloc_size() -> u32
                 {
-                    super::new_inputs(PairChainMaker::$make, $depth)
+                    let single_alloc_size = $size($depth);
+                    2 * single_alloc_size
+                }
+
+                pub fn new_inputs<'l>(alloc: &'l DatumAllocator<Datum<'l>>) -> [Input<'l>; 2]
+                {
+                    super::new_inputs(PairChainMaker::$make, $depth, alloc)
                 }
             }
         };
     }
 
-    shape! { list, LIST_LENGTH }
-    shape! { inverted_list, LIST_LENGTH }
-    shape! { degenerate_dag, DEGENERATE_DEPTH }
-    shape! { degenerate_cyclic, DEGENERATE_DEPTH }
-    shape! { long_list, list, LONG_LIST_LENGTH }
-    shape! { long_inverted_list, inverted_list, LONG_LIST_LENGTH }
-    shape! { long_degenerate_dag, degenerate_dag, LONG_DEGENERATE_DEPTH }
-    shape! { long_degenerate_cyclic, degenerate_cyclic, LONG_DEGENERATE_DEPTH }
-    shape! { short_list, list, SHORT_LIST_LENGTH }
-    shape! { short_inverted_list, inverted_list, SHORT_LIST_LENGTH }
-    shape! { short_degenerate_dag, degenerate_dag, SHORT_DEGENERATE_DEPTH }
-    shape! { short_degenerate_cyclic, degenerate_cyclic, SHORT_DEGENERATE_DEPTH }
+    shape! { list, LIST_LENGTH, list_size }
+    shape! { inverted_list, LIST_LENGTH, list_size }
+    shape! { degenerate_dag, DEGENERATE_DEPTH, degenerate_size }
+    shape! { degenerate_cyclic, DEGENERATE_DEPTH, degenerate_size }
+    shape! { long_list, list, LONG_LIST_LENGTH, list_size }
+    shape! { long_inverted_list, inverted_list, LONG_LIST_LENGTH, list_size }
+    shape! { long_degenerate_dag, degenerate_dag, LONG_DEGENERATE_DEPTH, degenerate_size }
+    shape! { long_degenerate_cyclic, degenerate_cyclic, LONG_DEGENERATE_DEPTH, degenerate_size }
+    shape! { short_list, list, SHORT_LIST_LENGTH, list_size }
+    shape! { short_inverted_list, inverted_list, SHORT_LIST_LENGTH, list_size }
+    shape! { short_degenerate_dag, degenerate_dag, SHORT_DEGENERATE_DEPTH, degenerate_size }
+    shape! { short_degenerate_cyclic, degenerate_cyclic, SHORT_DEGENERATE_DEPTH, degenerate_size }
 }
 
 
@@ -152,9 +169,10 @@ macro_rules! variation_benches {
             #[bench]
             fn $func(bencher: &mut Bencher)
             {
-                let [input1, input2] = new_inputs();
+                let alloc = DatumAllocator::<Datum<'_>>::new(alloc_size());
+                let [input1, input2] = new_inputs(&alloc);
                 $($(let $var = $arg;)*)?
-                let f = || $name::$func($($($var,)*)? input1.head.clone(), input2.head.clone());
+                let f = || $name::$func($($($var,)*)? input1.head, input2.head);
 
                 // Check that they are equivalent as expected.
                 assert!(IntoBool::into_bool(f()));
@@ -162,10 +180,11 @@ macro_rules! variation_benches {
                 // Benchmark.
                 bencher.iter(f);
 
-                // Drop cyclic and/or deep without stack overflow.
-                let [Input { head: My(head1), tail: My(tail1)},
-                     Input { head: My(head2), tail: My(tail2)}] = [input1, input2];
-                cycle_deep_safe_drop([(head1, tail1), (head2, tail2)]);
+                // Not needed with borrow_pair
+                // // Drop cyclic and/or deep without stack overflow.
+                // let [Input { head: My(head1), tail: My(tail1)},
+                //      Input { head: My(head2), tail: My(tail2)}] = [input1, input2];
+                // cycle_deep_safe_drop([(head1, tail1), (head2, tail2)]);
             }
         )+
     };
@@ -189,15 +208,19 @@ macro_rules! variation {
                     use {
                         super::*,
                         crate::{
-                            common::rc_pair::My,
+                            common::borrow_pair::{
+                                Datum,
+                                DatumAllocator,
+                            },
                             inputs::{
-                                $shape::new_inputs,
-                                Input,
+                                $shape::{
+                                    alloc_size,
+                                    new_inputs
+                                },
                             },
                             into_bool::IntoBool,
                         },
                         test::Bencher,
-                        tests_utils::shapes::cycle_deep_safe_drop,
                     };
 
                     variation_benches!($name, $benches);
@@ -278,18 +301,18 @@ mod extra
 {
     pub mod derived_eq
     {
-        use crate::common::rc_pair::{
+        use crate::common::borrow_pair::{
             Datum,
             My,
         };
 
-        pub fn eq(
-            a: My,
-            b: My,
+        pub fn eq<'l>(
+            a: My<'l>,
+            b: My<'l>,
         ) -> bool
         {
-            let a: &Datum = &*a.0;
-            let b: &Datum = &*b.0;
+            let a: &Datum = a.0;
+            let b: &Datum = b.0;
             <Datum as PartialEq>::eq(a, b)
         }
     }

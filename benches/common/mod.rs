@@ -1,6 +1,6 @@
 /// Reuse this module from the integration tests.
-#[path = "../../tests/common/rc_pair.rs"]
-pub mod rc_pair;
+#[path = "../../tests/common/borrow_pair.rs"]
+pub mod borrow_pair;
 
 
 /// The default values of the associated constants of [`cycle_deep_safe_compare`].
@@ -11,7 +11,7 @@ pub mod defaults
     #![allow(dead_code)]
 
     use {
-        super::rc_pair::My,
+        super::borrow_pair::My,
         cycle_deep_safe_compare::{
             cycle_safe::modes::interleave::{
                 self,
@@ -23,6 +23,7 @@ pub mod defaults
         },
         std::{
             cell::Cell,
+            marker::PhantomData,
             num::NonZeroU16,
             ops::Deref,
         },
@@ -42,16 +43,16 @@ pub mod defaults
     // able to `impl` the `interleave::Params` and `vecstack::Params` traits.
 
     #[derive(Clone, Default)]
-    struct Args;
+    struct Args<'l>(PhantomData<&'l ()>);
 
-    impl interleave::Params for Args
+    impl<'l> interleave::Params for Args<'l>
     {
-        type Node = My;
+        type Node = My<'l>;
         type RNG = Self;
         type Table = Self;
     }
 
-    impl random::NumberGenerator for Args
+    impl random::NumberGenerator for Args<'_>
     {
         fn rand_upto(
             &mut self,
@@ -62,7 +63,7 @@ pub mod defaults
         }
     }
 
-    impl Deref for Args
+    impl Deref for Args<'_>
     {
         type Target = Cell<equiv_classes::Class<Self>>;
 
@@ -72,7 +73,7 @@ pub mod defaults
         }
     }
 
-    impl equiv_classes::Rc for Args
+    impl equiv_classes::Rc for Args<'_>
     {
         fn new(_value: Cell<equiv_classes::Class<Self>>) -> Self
         {
@@ -80,9 +81,9 @@ pub mod defaults
         }
     }
 
-    impl equiv_classes::Table for Args
+    impl<'l> equiv_classes::Table for Args<'l>
     {
-        type Node = My;
+        type Node = My<'l>;
         type Rc = Self;
 
         fn get(
@@ -114,9 +115,9 @@ pub mod defaults
         pub const VECSTACK_INITIAL_CAPACITY: u32 =
             <Args as vecstack::Params>::INITIAL_CAPACITY as _;
 
-        impl vecstack::Params for Args
+        impl<'l> vecstack::Params for Args<'l>
         {
-            type Node = My;
+            type Node = My<'l>;
         }
     }
 }
