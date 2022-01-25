@@ -300,6 +300,22 @@ macro_rules! eq_variations_tests
         }
 
         #[cfg(test)]
+        mod deep_safe
+        {
+            use super::*;
+
+            mod vecqueue
+            {
+                $crate::eq_variation_mod_body!(
+                    graph_safe_compare::deep_safe::equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[ignore], #[cfg(all())]);
+            }
+        }
+
+        #[cfg(test)]
         mod wide_safe
         {
             use super::*;
@@ -347,7 +363,7 @@ macro_rules! eq_variations_tests
             use super::*;
 
             /// Use the call-stack for the precheck since that is limited and will not overflow
-            /// the stack when the stack is already shallow, and use the vector-stack for the
+            /// the stack when the stack is already shallow, and use the vector-queue for the
             /// interleave so great depth is supported since an input could be very-deep.
             fn precheck_interleave_equiv<N: graph_safe_compare::Node + Clone>(
                 a: N,
@@ -361,9 +377,9 @@ macro_rules! eq_variations_tests
                             self,
                             random::default,
                         },
-                        wide_safe::recursion::vecstack::{
+                        deep_safe::recursion::vecqueue::{
                             self,
-                            VecStack,
+                            VecQueue,
                         },
                         generic::{
                             precheck_interleave,
@@ -384,11 +400,11 @@ macro_rules! eq_variations_tests
                 {
                     type Error = Infallible;
                     type PrecheckRecurMode = CallStack;
-                    type InterleaveRecurMode = VecStack<Self>;
+                    type InterleaveRecurMode = VecQueue<Self>;
                     type InterleaveParams = Self;
                 }
 
-                impl<N: Node> vecstack::Params for Args<N>
+                impl<N: Node> vecqueue::Params for Args<N>
                 {
                     // Use custom value for this constant, not its default.
                     const INITIAL_CAPACITY: usize = 1 << 10;

@@ -36,9 +36,6 @@ pub mod defaults
     pub const FAST_LIMIT_MAX_RANGE_END: NonZeroU16 = Interleave::<Args>::FAST_LIMIT_MAX_RANGE_END;
     pub const SLOW_LIMIT_NEG: i32 = Interleave::<Args>::SLOW_LIMIT_NEG;
 
-    #[cfg(feature = "alloc")]
-    pub use wide_safe::VECSTACK_INITIAL_CAPACITY;
-
     // The items defined below are not involved in the benchmarks, and they're only needed to be
     // able to `impl` the `interleave::Params` and `vecstack::Params` traits.
 
@@ -101,23 +98,6 @@ pub mod defaults
         )
         {
             unreachable!()
-        }
-    }
-
-    #[cfg(feature = "alloc")]
-    mod wide_safe
-    {
-        use {
-            super::*,
-            graph_safe_compare::wide_safe::recursion::vecstack,
-        };
-
-        pub const VECSTACK_INITIAL_CAPACITY: u32 =
-            <Args as vecstack::Params>::INITIAL_CAPACITY as _;
-
-        impl<'l> vecstack::Params for Args<'l>
-        {
-            type Node = My<'l>;
         }
     }
 }

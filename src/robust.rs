@@ -5,6 +5,10 @@ use {
             random::default,
             Interleave,
         },
+        deep_safe::recursion::vecqueue::{
+            self,
+            VecQueue,
+        },
         generic::{
             equiv::{
                 self,
@@ -14,10 +18,6 @@ use {
             precheck_interleave,
         },
         utils::IntoOk as _,
-        wide_safe::recursion::vecstack::{
-            self,
-            VecStack,
-        },
         Node,
     },
     core::{
@@ -41,7 +41,7 @@ impl<N: Node> hash_map::Params for Args<N>
     type Node = N;
 }
 
-impl<N: Node> vecstack::Params for Args<N>
+impl<N: Node> vecqueue::Params for Args<N>
 {
     type Node = N;
 }
@@ -59,7 +59,7 @@ pub fn equiv<N: Node>(
         type DescendMode = Interleave<Self>;
         type Error = Infallible;
         type Node = N;
-        type RecurMode = VecStack<Self>;
+        type RecurMode = VecQueue<Self>;
     }
 
     let mut e = Equiv::<Args<N>>::default();
@@ -78,8 +78,8 @@ pub fn precheck_equiv<N: Node + Clone>(
     {
         type Error = Infallible;
         type InterleaveParams = Self;
-        type InterleaveRecurMode = VecStack<Self>;
-        type PrecheckRecurMode = VecStack<Self>;
+        type InterleaveRecurMode = VecQueue<Self>;
+        type PrecheckRecurMode = VecQueue<Self>;
     }
 
     precheck_interleave::equiv::<N, Args<N>>(a, b).into_ok()

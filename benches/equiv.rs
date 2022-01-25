@@ -33,9 +33,6 @@ mod inputs
     /// Long enough to cause stack overflow if the call-stack were used, and enough to cause a
     /// reallocation of a vec-stack (when the kind of "tail-call elimination" with a vec-stack is
     /// not involved).
-    #[cfg(feature = "alloc")]
-    const LONG_LIST_LENGTH: u32 = 2 * VECSTACK_INITIAL_CAPACITY;
-    #[cfg(not(feature = "alloc"))]
     const LONG_LIST_LENGTH: u32 = 2 * 2_u32.pow(17);
     /// Short enough that "precheck" completes, when involved.
     const SHORT_LIST_LENGTH: u32 = PRECHECK_LIMIT / 4;
@@ -247,6 +244,22 @@ variation! {
 #[cfg(feature = "alloc")]
 variation! {
     wide_safe,
+    [
+        list,
+        inverted_list,
+        degenerate_dag,
+        long_list,
+        long_inverted_list,
+        short_list,
+        short_inverted_list,
+        short_degenerate_dag
+    ],
+    [equiv]
+}
+
+#[cfg(feature = "alloc")]
+variation! {
+    deep_safe,
     [
         list,
         inverted_list,
