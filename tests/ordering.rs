@@ -1,12 +1,12 @@
 #[cfg(feature = "alloc")]
-use cycle_deep_safe_compare::deep_safe;
+use graph_safe_compare::wide_safe;
 #[cfg(feature = "std")]
-use cycle_deep_safe_compare::{
+use graph_safe_compare::{
     cycle_safe,
     robust,
 };
 use {
-    cycle_deep_safe_compare::{
+    graph_safe_compare::{
         basic,
         utils::RefId,
         Node,
@@ -128,7 +128,7 @@ macro_rules! case {
         }
 
         #[cfg(feature = "alloc")]
-        assert_eq!(deep_safe::equiv(a, b), r);
+        assert_eq!(wide_safe::equiv(a, b), r);
 
         assert_eq!(basic::equiv(a, b), r);
         assert_eq!(basic::limited_equiv(usize::MAX, a, b).unwrap(), r);

@@ -1,5 +1,5 @@
 use {
-    cycle_deep_safe_compare::{
+    graph_safe_compare::{
         basic::recursion::callstack::CallStack,
         cycle_safe::modes::interleave::{
             self,
@@ -54,8 +54,8 @@ impl PartialEq for My
             {
                 type Error = Infallible;
                 type InterleaveParams = Self;
-                type InterleaveRecurStack = CallStack;
-                type PrecheckRecurStack = CallStack;
+                type InterleaveRecurMode = CallStack;
+                type PrecheckRecurMode = CallStack;
             }
 
             impl hash_map::Params for Args

@@ -16,7 +16,7 @@ panic = "abort"
 
 [features]
 # Be able to test with the `std`-using items of the dependency.  Disabled by default.
-std = ["cycle_deep_safe_compare/std"]
+std = ["graph_safe_compare/std"]
 # Expected to cause build to fail due to missing items without "std".  Disabled by default.
 prove_dep_is_no_std = []
 
@@ -30,6 +30,6 @@ test = false  # Prevent trying to build as a test harness without `panic="abort"
 bench = false # Ditto.
 
 [dependencies]
-# Note: You should choose which RNG by giving `--features cycle_deep_safe_compare/$RNG`.
-cycle_deep_safe_compare = { path = "..", default-features = false }
+# Note: You should choose which RNG by giving `--features graph_safe_compare/$RNG`.
+graph_safe_compare = { path = "..", default-features = false }
 libc = { version = "0.2", default-features = false }

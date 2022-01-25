@@ -10,7 +10,7 @@ use {
 
 
 /// Use `Arc` just because it's different than
-/// `cycle_deep_safe_compare::generic::equiv_classes::premade::Rc`.  The multi-thread ability
+/// `graph_safe_compare::generic::equiv_classes::premade::Rc`.  The multi-thread ability
 /// provided by `Arc` is ignored.
 mod custom_rc
 {
@@ -22,7 +22,7 @@ mod custom_rc
             cell::Cell,
             ops::Deref,
         },
-        cycle_deep_safe_compare::generic::equiv_classes::{
+        graph_safe_compare::generic::equiv_classes::{
             self,
             Class,
         },
@@ -52,7 +52,7 @@ mod custom_rc
 
 
 /// Use `BTreeMap` just because it's different than
-/// `cycle_deep_safe_compare::generic::equiv_classes::premade::HashMap`.  The ordering of keys
+/// `graph_safe_compare::generic::equiv_classes::premade::HashMap`.  The ordering of keys
 /// provided by `BTreeMap` is ignored.
 mod custom_table
 {
@@ -64,7 +64,7 @@ mod custom_table
             Node,
         },
         alloc::collections::BTreeMap,
-        cycle_deep_safe_compare::generic::equiv_classes::Table,
+        graph_safe_compare::generic::equiv_classes::Table,
     };
 
     #[derive(Default)]
@@ -96,9 +96,9 @@ mod custom_table
 
 
 /// Use `LinkedList` just because it's different than
-/// `cycle_deep_safe_compare::deep_safe::recursion::vecstack::VecStack`.
+/// `graph_safe_compare::wide_safe::recursion::vecstack::VecStack`.
 ///
-/// Also, enables this integration test to be used when the `cycle_deep_safe_compare` crate is
+/// Also, enables this integration test to be used when the `graph_safe_compare` crate is
 /// built without the "std" feature enabled, and enables running the test cases of very-deep
 /// shapes.
 mod custom_recur_stack
@@ -111,13 +111,13 @@ mod custom_recur_stack
             My,
         },
         alloc::collections::LinkedList,
-        cycle_deep_safe_compare::{
+        graph_safe_compare::{
             basic::recursion::callstack::CallStack,
             generic::equiv::{
                 self,
                 EdgesIter,
                 Equiv,
-                RecurStack,
+                RecurMode,
             },
             Cmp,
             Node,
@@ -130,9 +130,9 @@ mod custom_recur_stack
     #[derive(Debug)]
     pub struct ExhaustedError;
 
-    impl<P> RecurStack<P> for ListStack
+    impl<P> RecurMode<P> for ListStack
     where
-        P: equiv::Params<Node = My, RecurStack = Self>,
+        P: equiv::Params<Node = My, RecurMode = Self>,
         ExhaustedError: Into<P::Error>,
     {
         type Error = ExhaustedError;
@@ -142,8 +142,8 @@ mod custom_recur_stack
             edges_iter: EdgesIter<P::Node>,
         ) -> Result<<P::Node as Node>::Cmp, Self::Error>
         {
-            if it.recur_stack.0.len() < 2_usize.pow(30) {
-                it.recur_stack.0.push_front(edges_iter);
+            if it.recur_mode.0.len() < 2_usize.pow(30) {
+                it.recur_mode.0.push_front(edges_iter);
                 Ok(Cmp::new_equiv())
             }
             else {
@@ -190,17 +190,17 @@ mod custom_recur_stack
     }
 }
 
-/// A different type, to test combining two custom `RecurStack` types.
+/// A different type, to test combining two custom `RecurMode` types.
 mod other_recur_stack
 {
     use {
         super::My,
-        cycle_deep_safe_compare::{
+        graph_safe_compare::{
             generic::equiv::{
                 self,
                 EdgesIter,
                 Equiv,
-                RecurStack,
+                RecurMode,
             },
             Cmp,
             Node,
@@ -217,9 +217,9 @@ mod other_recur_stack
     }
 
     /// Like `CallStack` but with custom error.
-    impl<P> RecurStack<P> for OtherStack
+    impl<P> RecurMode<P> for OtherStack
     where
-        P: equiv::Params<Node = My, RecurStack = Self>,
+        P: equiv::Params<Node = My, RecurMode = Self>,
         OtherStackError<P::Error>: Into<P::Error>,
     {
         type Error = OtherStackError<P::Error>;
@@ -259,7 +259,7 @@ mod other_recur_stack
 /// Use our own (dummy) PRNG to test not depending on any from the crate.
 mod custom_rng
 {
-    use cycle_deep_safe_compare::cycle_safe::modes::interleave::random;
+    use graph_safe_compare::cycle_safe::modes::interleave::random;
 
     #[derive(Default)]
     pub struct PseudoPseudoRNG(u128);
@@ -279,7 +279,7 @@ mod custom_rng
 }
 
 
-/// Use our custom `Table`, `Rc`, `RecurStack`, and `NumberGenerator` types.
+/// Use our custom `Table`, `Rc`, `RecurMode`, and `NumberGenerator` types.
 fn custom_equiv(
     a: My,
     b: My,
@@ -291,7 +291,7 @@ fn custom_equiv(
             ListStack,
         },
         custom_rng::PseudoPseudoRNG,
-        cycle_deep_safe_compare::{
+        graph_safe_compare::{
             cycle_safe::modes::interleave,
             generic::precheck_interleave::{
                 self,
@@ -355,8 +355,8 @@ fn custom_equiv(
         {
             type Error = ExhaustedOrOtherError;
             type InterleaveParams = InterleaveArgs;
-            type InterleaveRecurStack = ListStack;
-            type PrecheckRecurStack = OtherStack;
+            type InterleaveRecurMode = ListStack;
+            type PrecheckRecurMode = OtherStack;
         }
 
         precheck_interleave::equiv::<_, Args>(a.clone(), b.clone()).unwrap()
@@ -386,8 +386,8 @@ fn custom_equiv(
         {
             type Error = ExhaustedError;
             type InterleaveParams = InterleaveArgs;
-            type InterleaveRecurStack = ListStack;
-            type PrecheckRecurStack = ListStack;
+            type InterleaveRecurMode = ListStack;
+            type PrecheckRecurMode = ListStack;
         }
 
         precheck_interleave::equiv::<_, Args>(a, b).unwrap()

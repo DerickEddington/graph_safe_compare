@@ -55,7 +55,7 @@ mod premade
             type DescendMode = Interleave<Self>;
             type Error = Infallible;
             type Node = N;
-            type RecurStack = CallStack;
+            type RecurMode = CallStack;
         }
 
         let mut e = Equiv::<Args<N>>::default();
@@ -75,8 +75,8 @@ mod premade
         {
             type Error = Infallible;
             type InterleaveParams = Self;
-            type InterleaveRecurStack = CallStack;
-            type PrecheckRecurStack = CallStack;
+            type InterleaveRecurMode = CallStack;
+            type PrecheckRecurMode = CallStack;
         }
 
         precheck_interleave::equiv::<N, Args<N>>(a, b).into_ok()

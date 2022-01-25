@@ -73,9 +73,9 @@ pub mod robust;
 pub mod cycle_safe;
 
 #[cfg(feature = "alloc")]
-/// Items that are safe for very-deep graphs, but not, by themselves, for cyclic nor degenerate
+/// Items that are safe for very-wide graphs, but not, by themselves, for cyclic nor degenerate
 /// graphs.
-pub mod deep_safe;
+pub mod wide_safe;
 
 /// Items that are not safe for cyclic, degenerate, nor very-deep graphs.
 pub mod basic;

@@ -3,7 +3,7 @@
 pub mod borrow_pair;
 
 
-/// The default values of the associated constants of [`cycle_deep_safe_compare`].
+/// The default values of the associated constants of [`graph_safe_compare`].
 pub mod defaults
 {
     // For the below `const` items, because the `super` module is not `pub` and this file is
@@ -12,7 +12,7 @@ pub mod defaults
 
     use {
         super::borrow_pair::My,
-        cycle_deep_safe_compare::{
+        graph_safe_compare::{
             cycle_safe::modes::interleave::{
                 self,
                 random,
@@ -37,7 +37,7 @@ pub mod defaults
     pub const SLOW_LIMIT_NEG: i32 = Interleave::<Args>::SLOW_LIMIT_NEG;
 
     #[cfg(feature = "alloc")]
-    pub use deep_safe::VECSTACK_INITIAL_CAPACITY;
+    pub use wide_safe::VECSTACK_INITIAL_CAPACITY;
 
     // The items defined below are not involved in the benchmarks, and they're only needed to be
     // able to `impl` the `interleave::Params` and `vecstack::Params` traits.
@@ -105,11 +105,11 @@ pub mod defaults
     }
 
     #[cfg(feature = "alloc")]
-    mod deep_safe
+    mod wide_safe
     {
         use {
             super::*,
-            cycle_deep_safe_compare::deep_safe::recursion::vecstack,
+            graph_safe_compare::wide_safe::recursion::vecstack,
         };
 
         pub const VECSTACK_INITIAL_CAPACITY: u32 =

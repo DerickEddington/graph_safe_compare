@@ -152,7 +152,7 @@ macro_rules! eq_shapes_tests
 macro_rules! eq_variation_mod_body {
     ($algo_func:path, $my_type:ty, $datum_type:ty, $alloc_trans:tt, $make_alloc:expr) => {
         use {
-            cycle_deep_safe_compare::Cmp as _,
+            graph_safe_compare::Cmp as _,
             super::*,
             std::marker::PhantomData,
         };
@@ -243,22 +243,22 @@ macro_rules! eq_variations_tests
             mod unlimited
             {
                 $crate::eq_variation_mod_body!(
-                    cycle_deep_safe_compare::basic::equiv,
+                    graph_safe_compare::basic::equiv,
                     $my_type, $datum_type, $alloc_trans, $make_alloc);
 
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
                                          #[ignore], #[ignore]);
             }
 
-            fn limited_equiv<N: cycle_deep_safe_compare::Node>(
+            fn limited_equiv<N: graph_safe_compare::Node>(
                 a: N,
                 b: N,
             ) -> bool
             {
-                use cycle_deep_safe_compare::Cmp as _;
+                use graph_safe_compare::Cmp as _;
 
                 const LIMIT: u32 = 50;
-                matches!(cycle_deep_safe_compare::basic::limited_equiv(LIMIT, a, b),
+                matches!(graph_safe_compare::basic::limited_equiv(LIMIT, a, b),
                          Ok(cmp) if cmp.is_equiv())
             }
 
@@ -281,7 +281,7 @@ macro_rules! eq_variations_tests
             mod interleave
             {
                 $crate::eq_variation_mod_body!(
-                    cycle_deep_safe_compare::cycle_safe::equiv,
+                    graph_safe_compare::cycle_safe::equiv,
                     $my_type, $datum_type, $alloc_trans, $make_alloc);
 
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
@@ -291,7 +291,7 @@ macro_rules! eq_variations_tests
             mod precheck_interleave
             {
                 $crate::eq_variation_mod_body!(
-                    cycle_deep_safe_compare::cycle_safe::precheck_equiv,
+                    graph_safe_compare::cycle_safe::precheck_equiv,
                     $my_type, $datum_type, $alloc_trans, $make_alloc);
 
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
@@ -300,14 +300,14 @@ macro_rules! eq_variations_tests
         }
 
         #[cfg(test)]
-        mod deep_safe
+        mod wide_safe
         {
             use super::*;
 
             mod vecstack
             {
                 $crate::eq_variation_mod_body!(
-                    cycle_deep_safe_compare::deep_safe::equiv,
+                    graph_safe_compare::wide_safe::equiv,
                     $my_type, $datum_type, $alloc_trans, $make_alloc);
 
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
@@ -323,7 +323,7 @@ macro_rules! eq_variations_tests
             mod interleave_vecstack
             {
                 $crate::eq_variation_mod_body!(
-                    cycle_deep_safe_compare::robust::equiv,
+                    graph_safe_compare::robust::equiv,
                     $my_type, $datum_type, $alloc_trans, $make_alloc);
 
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
@@ -333,7 +333,7 @@ macro_rules! eq_variations_tests
             mod precheck_interleave_vecstack
             {
                 $crate::eq_variation_mod_body!(
-                    cycle_deep_safe_compare::robust::precheck_equiv,
+                    graph_safe_compare::robust::precheck_equiv,
                     $my_type, $datum_type, $alloc_trans, $make_alloc);
 
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
@@ -349,19 +349,19 @@ macro_rules! eq_variations_tests
             /// Use the call-stack for the precheck since that is limited and will not overflow
             /// the stack when the stack is already shallow, and use the vector-stack for the
             /// interleave so great depth is supported since an input could be very-deep.
-            fn precheck_interleave_equiv<N: cycle_deep_safe_compare::Node + Clone>(
+            fn precheck_interleave_equiv<N: graph_safe_compare::Node + Clone>(
                 a: N,
                 b: N,
             ) -> bool
             {
                 use {
-                    cycle_deep_safe_compare::{
+                    graph_safe_compare::{
                         basic::recursion::callstack::CallStack,
                         cycle_safe::modes::interleave::{
                             self,
                             random::default,
                         },
-                        deep_safe::recursion::vecstack::{
+                        wide_safe::recursion::vecstack::{
                             self,
                             VecStack,
                         },
@@ -383,8 +383,8 @@ macro_rules! eq_variations_tests
                 impl<N: Node> precheck_interleave::Params<N> for Args<N>
                 {
                     type Error = Infallible;
-                    type PrecheckRecurStack = CallStack;
-                    type InterleaveRecurStack = VecStack<Self>;
+                    type PrecheckRecurMode = CallStack;
+                    type InterleaveRecurMode = VecStack<Self>;
                     type InterleaveParams = Self;
                 }
 

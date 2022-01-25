@@ -7,7 +7,7 @@ pub use my::My;
 
 mod my
 {
-    use cycle_deep_safe_compare::{
+    use graph_safe_compare::{
         basic::equiv,
         Node,
     };
@@ -45,7 +45,7 @@ mod my
         }
     }
 
-    /// The usual reason for using `cycle_deep_safe_compare` is to impl this trait, but usually
+    /// The usual reason for using `graph_safe_compare` is to impl this trait, but usually
     /// `basic::equiv` would not be used and instead the more-capable functionality would be, but
     /// using it suffices for this test where the premade more-capable functions are not present
     /// (due to no "std") (would have to go to more effort to provide custom types for the generic
@@ -98,12 +98,12 @@ macro_rules! static_assert_dep_is_std {
         mod static_assert_dep_is_std
         {
             #[allow(unused_imports)]
-            use cycle_deep_safe_compare::{
+            use graph_safe_compare::{
                 cycle_safe::{
                     equiv,
                     precheck_equiv,
                 },
-                deep_safe,
+                wide_safe,
                 generic::equiv_classes::premade::{
                     hash_map::Table,
                     rc::Rc,

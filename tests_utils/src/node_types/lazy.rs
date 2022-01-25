@@ -133,9 +133,9 @@ impl Datum
     }
 }
 
-/// This `PartialEq` does not implement a `cycle_deep_safe_compare` algorithm and is only used for
+/// This `PartialEq` does not implement a `graph_safe_compare` algorithm and is only used for
 /// having an intentionally-naive algorithm that acts as if the shapes exist.  When
-/// `cycle_deep_safe_compare` algorithms are tested against this type, their functions must be
+/// `graph_safe_compare` algorithms are tested against this type, their functions must be
 /// called directly.
 impl PartialEq for Datum
 {

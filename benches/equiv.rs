@@ -129,7 +129,7 @@ mod into_bool
 {
     use {
         core::cmp::Ordering,
-        cycle_deep_safe_compare::Cmp,
+        graph_safe_compare::Cmp,
     };
 
     pub trait IntoBool
@@ -192,7 +192,7 @@ macro_rules! variation_benches {
 
 macro_rules! variation {
     ($name:ident, $shapes:tt, $benches:tt) => {
-        variation!($name, cycle_deep_safe_compare::$name, $shapes, $benches);
+        variation!($name, graph_safe_compare::$name, $shapes, $benches);
     };
     ($name:ident, $use_path:path, [$($shape:ident),+], $benches:tt) => {
         mod $name
@@ -246,7 +246,7 @@ variation! {
 
 #[cfg(feature = "alloc")]
 variation! {
-    deep_safe,
+    wide_safe,
     [
         list,
         inverted_list,

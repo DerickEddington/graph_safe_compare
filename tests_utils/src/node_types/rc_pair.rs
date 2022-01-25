@@ -11,9 +11,9 @@ use {
 };
 
 
-// Note that this derived PartialEq does not implement a `cycle_deep_safe_compare` algorithm and
+// Note that this derived PartialEq does not implement a `graph_safe_compare` algorithm and
 // is only used for demonstrating the limitations of the derived algorithm.  When
-// `cycle_deep_safe_compare` algorithms are tested against this type, their functions must be
+// `graph_safe_compare` algorithms are tested against this type, their functions must be
 // called directly.
 #[derive(PartialEq, Eq, Clone, Debug)]
 pub struct Datum(pub RefCell<Option<(Rc<Self>, Rc<Self>)>>);

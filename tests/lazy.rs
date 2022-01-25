@@ -1,5 +1,5 @@
 use {
-    cycle_deep_safe_compare::{
+    graph_safe_compare::{
         Cmp,
         Node,
     },

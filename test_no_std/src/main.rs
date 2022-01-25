@@ -14,7 +14,7 @@ test_no_std::static_assert_dep_is_std!();
 
 use {
     core::cmp::Ordering,
-    cycle_deep_safe_compare::{
+    graph_safe_compare::{
         basic::equiv,
         Node,
     },
@@ -61,7 +61,7 @@ impl Node for It
     }
 }
 
-/// The usual reason for using `cycle_deep_safe_compare` is to impl this trait, but usually
+/// The usual reason for using `graph_safe_compare` is to impl this trait, but usually
 /// `basic::equiv` would not be used and instead the more-capable functionality would be, but
 /// using it suffices for this test where the premade more-capable functions are not present (due
 /// to no "std") (would have to go to more effort to provide custom types for the generic

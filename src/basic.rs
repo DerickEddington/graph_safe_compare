@@ -48,7 +48,7 @@ mod premade
             type DescendMode = Unlimited;
             type Error = Infallible;
             type Node = N;
-            type RecurStack = CallStack;
+            type RecurMode = CallStack;
         }
 
         let mut e = Equiv::<Args<N>>::default();
@@ -76,7 +76,7 @@ mod premade
             type DescendMode = Limited<L>;
             type Error = LimitReached;
             type Node = N;
-            type RecurStack = CallStack;
+            type RecurMode = CallStack;
         }
 
         let mut e = Equiv::<Args<N, L>>::new(Limited(limit));
@@ -96,7 +96,7 @@ pub mod recursion
                 self,
                 EdgesIter,
                 Equiv,
-                RecurStack,
+                RecurMode,
             },
             Cmp,
             Node,
@@ -110,8 +110,8 @@ pub mod recursion
         pub struct CallStack;
 
         /// Enables [`CallStack`] to be used with the algorithm.
-        impl<P> RecurStack<P> for CallStack
-        where P: equiv::Params<RecurStack = Self>
+        impl<P> RecurMode<P> for CallStack
+        where P: equiv::Params<RecurMode = Self>
         {
             type Error = P::Error;
 
@@ -379,7 +379,7 @@ mod tests
                 type DescendMode = Limited<u32>;
                 type Error = LimitReached;
                 type Node = &'l Datum;
-                type RecurStack = CallStack;
+                type RecurMode = CallStack;
             }
 
             let mut e = Equiv::<LimitedArgs<'_>>::new(Limited(limit));

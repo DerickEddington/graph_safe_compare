@@ -40,9 +40,9 @@ impl Datum
     }
 }
 
-// Note that this PartialEq impl does not implement a `cycle_deep_safe_compare` algorithm and is
+// Note that this PartialEq impl does not implement a `graph_safe_compare` algorithm and is
 // only used for demonstrating the limitations of a naive algorithm.  When
-// `cycle_deep_safe_compare` algorithms are tested against this type, their functions must be
+// `graph_safe_compare` algorithms are tested against this type, their functions must be
 // called directly.
 impl PartialEq for Datum
 {

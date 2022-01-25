@@ -1,6 +1,6 @@
-use cycle_deep_safe_compare::utils::RefId;
+use graph_safe_compare::utils::RefId;
 pub use {
-    cycle_deep_safe_compare::Node,
+    graph_safe_compare::Node,
     std::{
         cmp::Ordering,
         rc::Rc,

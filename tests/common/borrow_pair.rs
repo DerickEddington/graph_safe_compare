@@ -1,9 +1,9 @@
 use {
-    cycle_deep_safe_compare::utils::RefId,
+    graph_safe_compare::utils::RefId,
     tests_utils::node_types::borrow_pair::Inner,
 };
 pub use {
-    cycle_deep_safe_compare::Node,
+    graph_safe_compare::Node,
     tests_utils::node_types::borrow_pair::{
         Datum,
         DatumAllocator,

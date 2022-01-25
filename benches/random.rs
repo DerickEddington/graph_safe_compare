@@ -4,7 +4,7 @@ extern crate test;
 
 use {
     core::num::NonZeroU16,
-    cycle_deep_safe_compare::cycle_safe::modes::interleave::random::NumberGenerator as _,
+    graph_safe_compare::cycle_safe::modes::interleave::random::NumberGenerator as _,
     test::Bencher,
 };
 
@@ -18,7 +18,7 @@ mod fastrand
 {
     use {
         super::*,
-        cycle_deep_safe_compare::cycle_safe::modes::interleave::random::fastrand,
+        graph_safe_compare::cycle_safe::modes::interleave::random::fastrand,
     };
 
     #[bench]
@@ -34,7 +34,7 @@ mod oorandom
 {
     use {
         super::*,
-        cycle_deep_safe_compare::cycle_safe::modes::interleave::random::oorandom,
+        graph_safe_compare::cycle_safe::modes::interleave::random::oorandom,
     };
 
     #[bench]
@@ -50,7 +50,7 @@ mod wyrng
 {
     use {
         super::*,
-        cycle_deep_safe_compare::cycle_safe::modes::interleave::random::wyrng,
+        graph_safe_compare::cycle_safe::modes::interleave::random::wyrng,
     };
 
     #[bench]

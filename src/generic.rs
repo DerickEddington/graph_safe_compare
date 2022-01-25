@@ -35,7 +35,7 @@ mod premade
                 type DescendMode = Limited<u16>;
                 type Error = PrecheckError<P::Error>;
                 type Node = N;
-                type RecurStack = P::PrecheckRecurStack;
+                type RecurMode = P::PrecheckRecurMode;
             }
 
             pub struct InterleaveArgs<N, P>(PhantomData<(N, P)>);
@@ -45,7 +45,7 @@ mod premade
                 type DescendMode = Interleave<P::InterleaveParams>;
                 type Error = InterleaveError<P::Error>;
                 type Node = N;
-                type RecurStack = P::InterleaveRecurStack;
+                type RecurMode = P::InterleaveRecurMode;
             }
         }
 
@@ -65,7 +65,7 @@ mod premade
             {
                 /// [`LimitReached`] occurred.  Abort the precheck.
                 LimitReached,
-                /// The [`precheck_interleave::Params::PrecheckRecurStack`] errored.
+                /// The [`precheck_interleave::Params::PrecheckRecurMode`] errored.
                 RecurError(E),
             }
 
@@ -88,7 +88,7 @@ mod premade
                 }
             }
 
-            /// The [`precheck_interleave::Params::InterleaveRecurStack`] errored while doing an
+            /// The [`precheck_interleave::Params::InterleaveRecurMode`] errored while doing an
             /// interleave.
             #[allow(clippy::exhaustive_structs)]
             pub struct InterleaveError<E>(pub E);
@@ -111,7 +111,7 @@ mod premade
         use {
             super::super::equiv::{
                 Equiv,
-                RecurStack,
+                RecurMode,
             },
             crate::{
                 basic::modes::limited::Limited,
@@ -129,14 +129,14 @@ mod premade
         pub trait Params<N: Node>: Sized
         {
             /// Type of recursion stack for the precheck.
-            type PrecheckRecurStack: RecurStack<PrecheckArgs<N, Self>>
-                + Into<Self::InterleaveRecurStack>;
+            type PrecheckRecurMode: RecurMode<PrecheckArgs<N, Self>>
+                + Into<Self::InterleaveRecurMode>;
             /// Type of recursion stack for the interleave.
-            type InterleaveRecurStack: RecurStack<InterleaveArgs<N, Self>>;
+            type InterleaveRecurMode: RecurMode<InterleaveArgs<N, Self>>;
             /// Type that `impl`s the arguments for the generic parameters for the interleave.
             type InterleaveParams: interleave::Params<Node = N>;
-            /// Type that represents the errors that can occur from [`Self::PrecheckRecurStack`]
-            /// and [`Self::InterleaveRecurStack`].
+            /// Type that represents the errors that can occur from [`Self::PrecheckRecurMode`]
+            /// and [`Self::InterleaveRecurMode`].
             type Error;
         }
 
@@ -146,8 +146,8 @@ mod premade
         /// very-deep graphs only when the interleave recursion-stack type is.
         ///
         /// # Errors
-        /// If the [`P::PrecheckRecurStack`](Params::PrecheckRecurStack) or
-        /// [`P::InterleaveRecurStack`](Params::InterleaveRecurStack) error, return an `Err` with
+        /// If the [`P::PrecheckRecurMode`](Params::PrecheckRecurMode) or
+        /// [`P::InterleaveRecurMode`](Params::InterleaveRecurMode) error, return an `Err` with
         /// a [`P::Error`](Params::Error) that represents the error.
         #[inline]
         pub fn equiv<N, P>(
@@ -234,7 +234,7 @@ mod recursion
     };
 
     /// Abstraction of recursion continuations.
-    pub trait RecurStack<P: Params>: Default
+    pub trait RecurMode<P: Params>: Default
     {
         /// Type of error that can occur.
         type Error: Into<P::Error>;
@@ -285,7 +285,7 @@ pub mod equiv
 {
     pub use super::{
         modes::DescendMode,
-        recursion::RecurStack,
+        recursion::RecurMode,
     };
     use crate::{
         utils::RangeIter,
@@ -301,9 +301,9 @@ pub mod equiv
         /// Type that controls descending node edges.
         type DescendMode: DescendMode<Self>;
         /// Type that provides recursion continuations.
-        type RecurStack: RecurStack<Self>;
+        type RecurMode: RecurMode<Self>;
         /// Type that represents the errors that can occur from [`Self::DescendMode`] and
-        /// [`Self::RecurStack`].
+        /// [`Self::RecurMode`].
         type Error;
     }
 
@@ -314,7 +314,7 @@ pub mod equiv
         /// Controls if node edges are descended into.
         pub(crate) descend_mode: P::DescendMode,
         /// Representation of recursion continuations.
-        pub recur_stack:         P::RecurStack,
+        pub recur_mode:          P::RecurMode,
     }
 
     impl<P: Params> Equiv<P>
@@ -325,7 +325,7 @@ pub mod equiv
         #[inline]
         pub fn new(descend_mode: P::DescendMode) -> Self
         {
-            Self { descend_mode, recur_stack: P::RecurStack::default() }
+            Self { descend_mode, recur_mode: P::RecurMode::default() }
         }
     }
 
@@ -340,7 +340,7 @@ pub mod equiv
         {
             Self {
                 descend_mode: P::DescendMode::default(),
-                recur_stack:  P::RecurStack::default(),
+                recur_mode:   P::RecurMode::default(),
             }
         }
     }
@@ -357,11 +357,11 @@ pub mod equiv
         /// Like [`From::from`].
         #[inline]
         pub fn from<PF: Params>(e: Equiv<PF>) -> Self
-        where PF::RecurStack: Into<PT::RecurStack>
+        where PF::RecurMode: Into<PT::RecurMode>
         {
             Self {
                 descend_mode: PT::DescendMode::default(),
-                recur_stack:  e.recur_stack.reset().into(),
+                recur_mode:   e.recur_mode.reset().into(),
             }
         }
     }
@@ -372,7 +372,7 @@ pub mod equiv
         #[inline]
         pub fn into<PT: Params>(self) -> Equiv<PT>
         where
-            PF::RecurStack: Into<PT::RecurStack>,
+            PF::RecurMode: Into<PT::RecurMode>,
             PT::DescendMode: Default,
         {
             Equiv::from(self)
@@ -381,7 +381,7 @@ pub mod equiv
 
     /// The primary logic of the algorithm.
     ///
-    /// This generic design works with the [`Node`], [`DescendMode`], and [`RecurStack`] traits to
+    /// This generic design works with the [`Node`], [`DescendMode`], and [`RecurMode`] traits to
     /// enable variations.
     impl<P: Params> Equiv<P>
     {
@@ -391,7 +391,7 @@ pub mod equiv
         /// trait implementations that define the variation of the logic.
         ///
         /// # Errors
-        /// If a [`DescendMode`] or [`RecurStack`] method gives an error, returns that error
+        /// If a [`DescendMode`] or [`RecurMode`] method gives an error, returns that error
         /// converted.
         #[inline]
         pub fn equiv(
@@ -400,14 +400,14 @@ pub mod equiv
             mut b: P::Node,
         ) -> Result<<P::Node as Node>::Cmp, P::Error>
         {
-            // This loop, when used in conjunction with certain `RecurStack::recur` and
-            // `RecurStack::next` implementations, is what prevents growing the call-stack, and so
+            // This loop, when used in conjunction with certain `RecurMode::recur` and
+            // `RecurMode::next` implementations, is what prevents growing the call-stack, and so
             // prevents the possibility of stack overflow, when traversing descendents.  For other
-            // implementations where the `RecurStack::recur` does grow the call-stack, the
-            // `RecurStack::next` always returns `None` and so this loop should be optimized away.
+            // implementations where the `RecurMode::recur` does grow the call-stack, the
+            // `RecurMode::next` always returns `None` and so this loop should be optimized away.
             loop {
                 match self.equiv_main(a, b) {
-                    Ok(cmp) if cmp.is_equiv() => match self.recur_stack.next() {
+                    Ok(cmp) if cmp.is_equiv() => match self.recur_mode.next() {
                         Some((an, bn)) => {
                             a = an;
                             b = bn;
@@ -422,7 +422,7 @@ pub mod equiv
         /// The main logic of the algorithm.
         ///
         /// Must not be used as the initial entry-point, but may be called by
-        /// [`RecurStack::recur`] implementations.
+        /// [`RecurMode::recur`] implementations.
         ///
         /// Returns same as [`Self::equiv`].
         ///
@@ -462,7 +462,7 @@ pub mod equiv
                 let amount_edges = try_cmp!(a.equiv_modulo_descendents_then_amount_edges(&b));
                 if amount_edges > 0.into() && try_into!(self.descend_mode.do_edges(&a, &b)) {
                     let edges_iter = EdgesIter::new(amount_edges, (a, b));
-                    return P::RecurStack::recur(self, edges_iter).map_err(Into::into);
+                    return P::RecurMode::recur(self, edges_iter).map_err(Into::into);
                 }
             }
 
@@ -472,7 +472,7 @@ pub mod equiv
 
     /// Get edges lazily, in increasing-index order.
     ///
-    /// Enables avoiding consuming excessive space for `RecurStack` types like `VecStack`.
+    /// Enables avoiding consuming excessive space for `RecurMode` types like `VecStack`.
     pub struct EdgesIter<N: Node>
     {
         counterparts: (N, N),

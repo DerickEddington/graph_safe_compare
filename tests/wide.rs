@@ -1,5 +1,5 @@
 use {
-    cycle_deep_safe_compare::{
+    graph_safe_compare::{
         utils::RefId,
         Node,
     },
@@ -121,7 +121,7 @@ macro_rules! variation_tests {
                 b: My,
             ) -> bool
             {
-                cycle_deep_safe_compare::$name::equiv(a, b)
+                graph_safe_compare::$name::equiv(a, b)
             }
 
             macro_rules! assert_equiv {
@@ -140,7 +140,7 @@ variation_tests!(robust);
 #[cfg(feature = "std")]
 variation_tests!(cycle_safe);
 #[cfg(feature = "alloc")]
-variation_tests!(deep_safe);
+variation_tests!(wide_safe);
 variation_tests!(basic);
 
 mod derived_eq
