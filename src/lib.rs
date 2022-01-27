@@ -1,7 +1,5 @@
-//! Generic equivalence predicate that can handle cyclic, very-deep, very-large, and degenerate
-//! graphs.  Extends the algorithm described in the paper [Efficient Nondestructive Equality
-//! Checking for Trees and Graphs](https://michaeldadams.org/papers/efficient_equality/).  TODO:
-//! Has further enhancements, like ordering comparison ...
+#![cfg_attr(unix, doc = include_str!("../README.md"))]
+#![cfg_attr(windows, doc = include_str!("..\\README.md"))]
 #![cfg_attr(
     not(feature = "std"),
     doc = "\n",

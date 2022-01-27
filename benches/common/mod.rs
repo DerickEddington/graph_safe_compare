@@ -1,5 +1,6 @@
 /// Reuse this module from the integration tests.
-#[path = "../../tests/common/borrow_pair.rs"]
+#[cfg_attr(unix, path = "../../tests/common/borrow_pair.rs")]
+#[cfg_attr(windows, path = "..\\..\\tests\\common\\borrow_pair.rs")]
 pub mod borrow_pair;
 
 
