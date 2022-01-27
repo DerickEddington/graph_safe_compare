@@ -128,10 +128,10 @@ mod premade
         /// Generic parameters of [`equiv`].
         pub trait Params<N: Node>: Sized
         {
-            /// Type of recursion stack for the precheck.
+            /// Type of recursion mode for the precheck.
             type PrecheckRecurMode: RecurMode<PrecheckArgs<N, Self>>
                 + Into<Self::InterleaveRecurMode>;
-            /// Type of recursion stack for the interleave.
+            /// Type of recursion mode for the interleave.
             type InterleaveRecurMode: RecurMode<InterleaveArgs<N, Self>>;
             /// Type that `impl`s the arguments for the generic parameters for the interleave.
             type InterleaveParams: interleave::Params<Node = N>;
@@ -143,7 +143,7 @@ mod premade
         /// Equivalence predicate that can handle cyclic graphs, but first tries the precheck that
         /// is faster for small acyclic graphs, and that requires choosing specific type arguments
         /// that determine the implementations of internal dynamic data structures.  Safe for
-        /// very-deep graphs only when the interleave recursion-stack type is.
+        /// very-deep graphs only when the interleave recursion-mode type is.
         ///
         /// # Errors
         /// If the [`P::PrecheckRecurMode`](Params::PrecheckRecurMode) or
@@ -265,12 +265,12 @@ mod recursion
 
         /// Reset to be empty while preserving capacity, if relevant.
         ///
-        /// An aborted precheck, that uses particular types of recursion-stacks, might leave some
-        /// elements on such a stack, in which case it needs to be reset before doing the
-        /// interleave using the same stack.
+        /// An aborted precheck, that uses particular types of recursion-modes, might leave some
+        /// elements on such a structure, in which case it needs to be reset before doing the
+        /// interleave using the same structure.
         ///
-        /// Also, some things that take ownership of a `Self` might call this to ensure a stack is
-        /// in a fresh state.
+        /// Also, some things that take ownership of a `Self` might call this to ensure a
+        /// structure is in a fresh state.
         ///
         /// When it is more efficient, the `self` value should be reset and then returned.  But a
         /// newly-created value may be returned if desired.
@@ -345,9 +345,8 @@ pub mod equiv
         }
     }
 
-    /// Enables the same recursion-stack value to be reused across the precheck and the
-    /// interleave, which is more efficient for some types since this avoids dropping it and
-    /// creating another.
+    /// Enables the same recursion-mode value to be reused across the precheck and the interleave,
+    /// which is more efficient for some types since this avoids dropping it and creating another.
     ///
     /// [`From`] or [`Into`] cannot be `impl`ed for this, because that would conflict with the
     /// blanket implementations provided by the `core` library.

@@ -136,7 +136,7 @@ pub mod recursion
                 None
             }
 
-            /// Only for compatibility with generic uses of recursion-stack types.  The call-stack
+            /// Only for compatibility with generic uses of recursion-mode types.  The call-stack
             /// does not need to be reset, so this is a no-op for this type.
             #[inline]
             fn reset(self) -> Self
