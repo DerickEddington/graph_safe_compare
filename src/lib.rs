@@ -28,6 +28,7 @@
     clippy::all,
     clippy::pedantic,
     clippy::restriction,
+    clippy::cargo,
     // Individual lints not included in above groups and desired.
     macro_use_extern_crate,
     meta_variable_misuse,

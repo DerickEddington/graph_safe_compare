@@ -1,11 +1,15 @@
 [package]
 name = "graph_safe_compare"
-version = "0.0.0"
+version = "0.1.0"
+description = "Equivalence predicate that can handle cyclic, shared, and very-deep graphs."
 authors = ["Derick Eddington"]
 license = "Unlicense"
 repository = "https://github.com/DerickEddington/graph_safe_compare"
 edition = "2021"
 rust-version = "1.57"
+readme = "README.md"
+categories = ["algorithms", "no-std"]
+keywords = ["graphs", "cyclic", "equivalence", "comparison", "no_std"]
 
 [workspace]
 # The `test_no_std` package is independent, not a member of the workspace, so
