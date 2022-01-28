@@ -30,9 +30,9 @@ mod inputs
     /// that "interleave" must be done, when involved; but not very long.  `2*L` recursions for
     /// all variants.
     const LIST_LENGTH: u32 = 20 * PRECHECK_LIMIT;
-    /// Long enough to cause stack overflow if the call-stack were used, and enough to cause a
-    /// reallocation of a vec-stack (when the kind of "tail-call elimination" with a vec-stack is
-    /// not involved).
+    /// Long enough to cause stack overflow if the call-stack were used, and enough to cause
+    /// reallocations of a vec-stack (when the kind of "tail-call elimination" with a vec-stack is
+    /// not involved) but not of a vec-queue.
     const LONG_LIST_LENGTH: u32 = 2 * 2_u32.pow(17);
     /// Short enough that "precheck" completes, when involved.
     const SHORT_LIST_LENGTH: u32 = PRECHECK_LIMIT / 4;
@@ -42,9 +42,9 @@ mod inputs
     /// same amount of recursions as with lists of `LONG_LIST_LENGTH`, for basic variants.
     const DEGENERATE_DEPTH: u32 = log2(2 * LONG_LIST_LENGTH + 2) - 1;
     /// Deep enough to be far too slow for basic variants but doable for "interleave" variants,
-    /// and enough to require a vec-stack and a reallocation of it.  The value is derived to cause
-    /// the same amount of recursions as with lists of `LONG_LIST_LENGTH`, for "interleave"
-    /// variants.
+    /// and enough to require reallocations of a vec-stack but not of a vec-queue.  The value is
+    /// derived to cause the same amount of recursions as with lists of `LONG_LIST_LENGTH`, for
+    /// "interleave" variants.
     const LONG_DEGENERATE_DEPTH: u32 = LONG_LIST_LENGTH;
     /// Shallow enough that "precheck" completes, when involved.
     const SHORT_DEGENERATE_DEPTH: u32 = log2(PRECHECK_LIMIT + 2) - 1;

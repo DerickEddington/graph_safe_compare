@@ -96,13 +96,11 @@ test result: ok. 0 passed; 0 failed; 0 ignored; 74 measured; 0 filtered out; fin
 
 ## Interpretation
 
-TODO: Update the following, for latest different results, before publishing.
-
 ---
 
 ```
-basic::degenerate_dag::equiv                        ... bench:   3,847,750 ns/iter (+/- 70,649)
-basic::degenerate_dag::limited_equiv                ... bench:   3,974,424 ns/iter (+/- 68,153)
+basic::degenerate_dag::equiv                        ... bench:   1,433,309 ns/iter (+/- 60,091)
+basic::degenerate_dag::limited_equiv                ... bench:   1,520,915 ns/iter (+/- 69,427)
 ```
 
 The basic variant, which is similar to the common `derive`d `PartialEq`, does not detect shared
@@ -119,15 +117,15 @@ with much shallower depth).  With a depth of `18`, `2^19 - 2` recursions are don
 ---
 
 ```
-basic::inverted_list::equiv                         ... bench:     175,439 ns/iter (+/- 12,300)
-basic::inverted_list::limited_equiv                 ... bench:     188,871 ns/iter (+/- 8,864)
-basic::list::equiv                                  ... bench:     161,609 ns/iter (+/- 36,843)
-basic::list::limited_equiv                          ... bench:     166,787 ns/iter (+/- 24,798)
+basic::inverted_list::equiv                         ... bench:      47,667 ns/iter (+/- 6,044)
+basic::inverted_list::limited_equiv                 ... bench:      49,089 ns/iter (+/- 6,787)
+basic::list::equiv                                  ... bench:      52,502 ns/iter (+/- 8,509)
+basic::list::limited_equiv                          ... bench:      57,698 ns/iter (+/- 6,841)
 ```
 
 All variants do `2*length` recursions for lists.
 
-The basic variant uses the normal call-stack, which seems to be nearly as fast for `inverted_list`
+The basic variant uses the normal call-stack, which seems to be approx. as fast for `inverted_list`
 (left edges: list tail, right edges: leaf elements) as it is for `list` (left edges: leaf
 elements, right edges: list tail).
 
@@ -136,8 +134,8 @@ These cases, with a length of `8,000`, do `16,000` recursions.
 ---
 
 ```
-basic::short_degenerate_dag::equiv                  ... bench:       1,942 ns/iter (+/- 82)
-basic::short_degenerate_dag::limited_equiv          ... bench:       2,033 ns/iter (+/- 82)
+basic::short_degenerate_dag::equiv                  ... bench:         659 ns/iter (+/- 29)
+basic::short_degenerate_dag::limited_equiv          ... bench:         729 ns/iter (+/- 26)
 ```
 
 These cases, with a depth of `7`, do `254` (`2^8 - 2`) recursions.
@@ -145,10 +143,10 @@ These cases, with a depth of `7`, do `254` (`2^8 - 2`) recursions.
 ---
 
 ```
-basic::short_inverted_list::equiv                   ... bench:       1,745 ns/iter (+/- 69)
-basic::short_inverted_list::limited_equiv           ... bench:       1,927 ns/iter (+/- 69)
-basic::short_list::equiv                            ... bench:       1,723 ns/iter (+/- 80)
-basic::short_list::limited_equiv                    ... bench:       1,807 ns/iter (+/- 72)
+basic::short_inverted_list::equiv                   ... bench:         512 ns/iter (+/- 21)
+basic::short_inverted_list::limited_equiv           ... bench:         578 ns/iter (+/- 32)
+basic::short_list::equiv                            ... bench:         512 ns/iter (+/- 21)
+basic::short_list::limited_equiv                    ... bench:         559 ns/iter (+/- 30)
 ```
 
 These cases, with a length of `100`, do `200` recursions.
@@ -156,10 +154,10 @@ These cases, with a length of `100`, do `200` recursions.
 ---
 
 ```
-cycle_safe::degenerate_cyclic::equiv                ... bench:       2,988 ns/iter (+/- 53)
-cycle_safe::degenerate_cyclic::precheck_equiv       ... bench:       6,820 ns/iter (+/- 297)
-cycle_safe::degenerate_dag::equiv                   ... bench:       2,931 ns/iter (+/- 86)
-cycle_safe::degenerate_dag::precheck_equiv          ... bench:       6,152 ns/iter (+/- 419)
+cycle_safe::degenerate_cyclic::equiv                ... bench:       2,933 ns/iter (+/- 159)
+cycle_safe::degenerate_cyclic::precheck_equiv       ... bench:       4,174 ns/iter (+/- 434)
+cycle_safe::degenerate_dag::equiv                   ... bench:       2,917 ns/iter (+/- 145)
+cycle_safe::degenerate_dag::precheck_equiv          ... bench:       4,002 ns/iter (+/- 320)
 ```
 
 The cycle-safe variants do detect shared structure and so do only `2*depth` recursions for the
@@ -170,9 +168,9 @@ variant, each recursion involves hash-table operations, because the "interleave"
 "slow" phase for all recursions due to continously detecting shared structure.
 
 For the `equiv` cases, which only do the "interleave" mode, while the `recursion/ns` speed is
-around `10%` as fast, there are only around `0.007%` as many recursions, and so it handles the
-same `degenerate_dag` shape around `130,000%` as fast and handles the `degenerate_cyclic` shape at
-that speed which the basic and only-deep-safe variants cannot handle at any speed.
+around `3%` as fast, there are only around `0.007%` as many recursions, and so it handles the same
+`degenerate_dag` shape around `49,100%` as fast and handles the `degenerate_cyclic` shape at that
+speed which the basic and only-deep-safe variants cannot handle at any speed.
 
 For the `precheck_equiv` cases, the "precheck" mode, which is like the limited basic variant,
 would need to do `2^19 - 2` recursions but reaches its limit and aborts (due to, either, the
@@ -184,10 +182,10 @@ shared-structure detection.
 ---
 
 ```
-cycle_safe::inverted_list::equiv                    ... bench:     238,830 ns/iter (+/- 40,060)
-cycle_safe::inverted_list::precheck_equiv           ... bench:     242,658 ns/iter (+/- 40,944)
-cycle_safe::list::equiv                             ... bench:     246,091 ns/iter (+/- 41,619)
-cycle_safe::list::precheck_equiv                    ... bench:     237,945 ns/iter (+/- 63,633)
+cycle_safe::inverted_list::equiv                    ... bench:     117,080 ns/iter (+/- 21,993)
+cycle_safe::inverted_list::precheck_equiv           ... bench:     118,758 ns/iter (+/- 24,359)
+cycle_safe::list::equiv                             ... bench:     120,221 ns/iter (+/- 24,705)
+cycle_safe::list::precheck_equiv                    ... bench:     121,167 ns/iter (+/- 26,692)
 ```
 
 Like the basic variant, the cycle-safe variants do `2*length` recursions for lists.  Unlike the
@@ -197,25 +195,26 @@ phase with a basic "fast" phase.
 These cases, with a length of `8,000`, do `16,000` recursions.
 
 For these lists without shared structure, the "slow" phase only does about `10%` of recursions and
-the "fast" phase does about `90%`.  These cases are around `69%` as fast as the basic variant,
+the "fast" phase does about `90%`.  These cases are around `44%` as fast as the basic variant,
 which is not too bad of a trade-off for the ability to also handle cyclic and degenerate graphs
 efficiently.
 
 ---
 
 ```
-cycle_safe::short_degenerate_cyclic::equiv          ... bench:       1,323 ns/iter (+/- 40)
-cycle_safe::short_degenerate_cyclic::precheck_equiv ... bench:       5,109 ns/iter (+/- 195)
-cycle_safe::short_degenerate_dag::equiv             ... bench:       1,263 ns/iter (+/- 33)
-cycle_safe::short_degenerate_dag::precheck_equiv    ... bench:       1,955 ns/iter (+/- 35)
+cycle_safe::short_degenerate_cyclic::equiv          ... bench:       1,279 ns/iter (+/- 50)
+cycle_safe::short_degenerate_cyclic::precheck_equiv ... bench:       2,496 ns/iter (+/- 125)
+cycle_safe::short_degenerate_dag::equiv             ... bench:       1,232 ns/iter (+/- 55)
+cycle_safe::short_degenerate_dag::precheck_equiv    ... bench:         728 ns/iter (+/- 52)
 ```
 
 These cases, with a depth of `7`, do only `14` recursions for the `equiv` cases, unlike the basic
 variant.
 
-The "interleave" mode stays in its "slow" phase for all recursions, but the
-`short_degenerate_dag::equiv` case is still faster than `basic` and `deep_safe` due to less
-recursions, and the `short_degenerate_cyclic::equiv` is also fast and can be handled.
+The "interleave" mode stays in its "slow" phase for all recursions, and so the
+`short_degenerate_dag::equiv` case is slower than `basic`, but at least the
+`short_degenerate_cyclic::equiv` can also be handled at that speed which is acceptable for having
+cycle-safety which `basic` does not.
 
 The `short_degenerate_cyclic::precheck_equiv` case wastes the effort of the "precheck" mode on
 this shape that has more basic-traversed edges (infinite) than the precheck limit.
@@ -227,10 +226,10 @@ fast as the `limited_equiv` of the basic variant
 ---
 
 ```
-cycle_safe::short_inverted_list::equiv              ... bench:       6,635 ns/iter (+/- 241)
-cycle_safe::short_inverted_list::precheck_equiv     ... bench:       1,820 ns/iter (+/- 57)
-cycle_safe::short_list::equiv                       ... bench:       4,459 ns/iter (+/- 143)
-cycle_safe::short_list::precheck_equiv              ... bench:       1,758 ns/iter (+/- 27)
+cycle_safe::short_inverted_list::equiv              ... bench:       5,387 ns/iter (+/- 448)
+cycle_safe::short_inverted_list::precheck_equiv     ... bench:         560 ns/iter (+/- 9)
+cycle_safe::short_list::equiv                       ... bench:       5,186 ns/iter (+/- 678)
+cycle_safe::short_list::precheck_equiv              ... bench:         559 ns/iter (+/- 23)
 ```
 
 These cases, with a length of `100`, do `200` recursions, like the basic variant.
@@ -246,110 +245,81 @@ and degenerate inputs while not wasting too much effort.
 ---
 
 ```
-deep_safe::degenerate_dag::equiv                    ... bench:   2,822,701 ns/iter (+/- 140,410)
+deep_safe::degenerate_dag::equiv                    ... bench:   1,517,375 ns/iter (+/- 271,506)
 ```
 
-The deep-safe variants do not use the normal call-stack and instead use a vector as the stack of
+The deep-safe variants do not use the normal call-stack and instead use a vector as a queue of
 which nodes to continue recurring on.
 
 The `deep_safe` cases, like the basic variant, do not detect shared structure, and so must do
 `2^(depth+1)-2` recursions for the `degenerate_dag` graph shape.  With a depth of `18`, `2^19 - 2`
 recursions are done.
 
-The vector stack is `136%` as fast as the call-stack, comparing this case to
-`basic::degenerate_dag::equiv`, presumably due to a vector being faster at pushing and popping due
-to those operations being simpler and smaller than they are for the call-stack.
+The vector queue is `94%` as fast as the call-stack, comparing this case to
+`basic::degenerate_dag::equiv`.
 
 ---
 
 ```
-deep_safe::inverted_list::equiv                     ... bench:      91,485 ns/iter (+/- 24,764)
-deep_safe::list::equiv                              ... bench:      88,588 ns/iter (+/- 7,122)
+deep_safe::inverted_list::equiv                     ... bench:      41,912 ns/iter (+/- 1,982)
+deep_safe::list::equiv                              ... bench:      41,612 ns/iter (+/- 2,126)
 ```
 
 Like the basic variant, the deep-safe variants do `2*length` recursions for lists.
 
-These cases, with a length of `8,000`, do `16,000` recursions, on a vector stack.
+These cases, with a length of `8,000`, do `16,000` recursions, on a vector queue.
 
-The vector stack is `182%` and `192%` as fast as the call-stack, comparing these cases to the
+The vector queue is `126%` and `114%` as fast as the call-stack, comparing these cases to the
 `basic::list::equiv` and `basic::inverted_list::equiv` cases.
 
 ---
 
 ```
-deep_safe::long_inverted_list::equiv                ... bench:   6,459,989 ns/iter (+/- 290,648)
-deep_safe::long_list::equiv                         ... bench:   3,812,624 ns/iter (+/- 395,841)
+deep_safe::long_inverted_list::equiv                ... bench:   1,408,319 ns/iter (+/- 75,921)
+deep_safe::long_list::equiv                         ... bench:   1,380,287 ns/iter (+/- 98,359)
 ```
 
-These cases, with a length of `2^18`, do `2^19` recursions, on a vector stack.
+These cases, with a length of `2^18`, do `2^19` recursions, on a vector queue.
 
-The same amount of recursions is done as the `degenerate_dag` cases, but with much deeper depth.
-While the `recursion/ns` speed is, at worst, around `43%` as fast, or, at best, around `74%` as
-fast, (comparing `deep_safe::long_inverted_list::equiv` or `deep_safe::long_list::equiv` to
-`deep_safe::degenerate_dag::equiv`), the deep-safe variants can handle very-deep graphs which the
-basic and only-cycle-safe variants cannot handle at any speed.
-
-While a vector stack is faster than the call stack for the cases with shallower shapes, it is
-slower for these cases.  For the `long_inverted_list` shape, this is expected, but for the
-`long_list` shape, it is unexpected.
-
-The `long_list` benefits from a kind of "tail-call elimination" because it descends its list
-elements, which are leaf nodes, before descending its list tails, and so the maximum amount of
-items on its vector stack should be only `2`.  Whereas, `long_inverted_list` descends its list
-tails before its list elements, and so the maximum amount of items on its vector stack should be
-the same as its length of `2^18`.
-
-With `long_inverted_list` using so much of a vector there are factors that explain why it is
-slower than `long_list`.  Linux's demand paging of larger allocations is suspected to be at play,
-which will cause some slow-down since the cost is not amortized since the vector memory is
-allocated and used only once for each iteration of this case.  Further, twice the initial capacity
-of a vector is used, causing a reallocation for resizing it, for each iteration, which will cause
-more slow-down.
-
-It is currently unexplained why the speed of the `long_list` case is not closer to that of
-`deep_safe::degenerate_dag::equiv`.  It is assumed to not be due to cache-locality differences
-regarding their vector stacks, since they both access only the very beginning of a vector.
-
-(Note about achieving the TCE outside these benchmarks: Users can control the order that edges are
-descended for their types, and so can achieve TCE for their shapes regardless of whether they are
-"left-handed" or "right-handed".  Unlike with traditional TCE of fixed equivalence predicates.)
+The same amount of recursions is done as the `degenerate_dag` cases, and the `recursion/ns` speed
+is approx. the same as `deep_safe::degenerate_dag::equiv` and `basic::degenerate_dag::equiv`.
 
 ---
 
 ```
-deep_safe::short_degenerate_dag::equiv              ... bench:       1,371 ns/iter (+/- 57)
+deep_safe::short_degenerate_dag::equiv              ... bench:         685 ns/iter (+/- 39)
 ```
 
 This case, with a depth of `7`, does `254` (`2^8 - 2`) recursions, like the basic variant, but on
-a vector stack, unlike the basic variant.
+a vector queue, unlike the basic variant.
 
-The vector stack is `142%` as fast as the call-stack, comparing this case to
+The vector queue is approx. as fast as the call-stack, comparing this case to
 `basic::short_degenerate_dag::equiv`.
 
 ---
 
 ```
-deep_safe::short_inverted_list::equiv               ... bench:       1,076 ns/iter (+/- 39)
-deep_safe::short_list::equiv                        ... bench:       1,064 ns/iter (+/- 46)
+deep_safe::short_inverted_list::equiv               ... bench:         529 ns/iter (+/- 32)
+deep_safe::short_list::equiv                        ... bench:         526 ns/iter (+/- 20)
 ```
 
 These cases, with a length of `100`, do `200` recursions, like the basic variant, but on a vector
-stack, unlike the basic variant.
+queue, unlike the basic variant.
 
-The vector stack is `162%` as fast as the call-stack, comparing these cases to
+The vector queue is approx. as fast as the call-stack, comparing these cases to
 `basic::short_list::equiv` and `basic::short_inverted_list::equiv`.
 
 ---
 
 ```
-robust::degenerate_cyclic::equiv                    ... bench:       3,055 ns/iter (+/- 156)
-robust::degenerate_cyclic::precheck_equiv           ... bench:       5,099 ns/iter (+/- 38)
-robust::degenerate_dag::equiv                       ... bench:       2,995 ns/iter (+/- 49)
-robust::degenerate_dag::precheck_equiv              ... bench:       5,287 ns/iter (+/- 145)
+robust::degenerate_cyclic::equiv                    ... bench:       2,948 ns/iter (+/- 137)
+robust::degenerate_cyclic::precheck_equiv           ... bench:       4,381 ns/iter (+/- 186)
+robust::degenerate_dag::equiv                       ... bench:       2,879 ns/iter (+/- 91)
+robust::degenerate_dag::precheck_equiv              ... bench:       4,330 ns/iter (+/- 166)
 ```
 
 The robust variant is like a combination of `cycle_safe` and `deep_safe`, in that it does detect
-shared structure and so is cycle-safe and that it uses a vector stack and so is deep-safe.  Like
+shared structure and so is cycle-safe and that it uses a vector queue and so is deep-safe.  Like
 `cycle_safe`, and unlike `deep_safe` and `basic`, it does only `2*depth` recursions for the
 `degenerate_dag` and `degenerate_cyclic` graph shapes.
 
@@ -357,41 +327,39 @@ These cases, with a depth of `18`, do `36` recursions, involving hash-table oper
 `cycle_safe`.
 
 The `equiv` cases have the same speed as the `cycle_safe` cases, as expected, since they do the
-"interleave" mode staying in "slow" phase the same, but a vector stack is used instead of the call
+"interleave" mode staying in "slow" phase the same, but a vector queue is used instead of the call
 stack.
 
 The `precheck_equiv` cases waste the effort of the "precheck" mode for these large (as traversed
-basically) or cyclic shapes, like the `cycle_safe` cases, as expected, but the cost is a little
-less due to the "precheck" mode using a vector stack, which improves the attractiveness of the
-trade-off for the precheck (which benefits different shapes: those that are small and acyclic).
+basically) or cyclic shapes, like the `cycle_safe` cases, as expected.
 
 ---
 
 ```
-robust::inverted_list::equiv                        ... bench:     161,694 ns/iter (+/- 9,852)
-robust::inverted_list::precheck_equiv               ... bench:     163,608 ns/iter (+/- 20,359)
-robust::list::equiv                                 ... bench:     156,986 ns/iter (+/- 13,962)
-robust::list::precheck_equiv                        ... bench:     173,661 ns/iter (+/- 22,156)
+robust::inverted_list::equiv                        ... bench:     103,460 ns/iter (+/- 6,442)
+robust::inverted_list::precheck_equiv               ... bench:     105,235 ns/iter (+/- 9,100)
+robust::list::equiv                                 ... bench:     103,715 ns/iter (+/- 8,440)
+robust::list::precheck_equiv                        ... bench:     110,508 ns/iter (+/- 1,681)
 ```
 
 Like `basic`, the robust variant does `2*length` recursions for lists.  Like `deep_safe`, a vector
-stack is used.  Like `cycle_safe`, the "interleave" mode is used with about `10%` "slow" phase and
+queue is used.  Like `cycle_safe`, the "interleave" mode is used with about `10%` "slow" phase and
 about `90%` "fast" phase.
 
 These cases, with a length of `8,000`, do `16,000` recursions.
 
-The speed is as fast as `basic`, is significantly slower than `deep_safe` due to the involvement
-of the "slow" phase of "interleave" mode, and is significantly faster than `cycle_safe` due to the
-use of a vector stack, which improves the attractiveness of the trade-off for the cycle-safety,
-and it also has the deep-safety.
+The speed is significantly slower than `basic` and `deep_safe` due to the involvement of the
+"slow" phase of "interleave" mode, and is a little faster than `cycle_safe` due to the use of a
+vector queue, which improves the attractiveness of the trade-off for the cycle-safety, and it also
+has the deep-safety.
 
 ---
 
 ```
-robust::long_degenerate_cyclic::equiv               ... bench: 112,770,332 ns/iter (+/- 6,191,108)
-robust::long_degenerate_cyclic::precheck_equiv      ... bench: 109,561,112 ns/iter (+/- 6,810,804)
-robust::long_degenerate_dag::equiv                  ... bench: 112,442,771 ns/iter (+/- 6,530,739)
-robust::long_degenerate_dag::precheck_equiv         ... bench: 108,724,493 ns/iter (+/- 5,582,998)
+robust::long_degenerate_cyclic::equiv               ... bench:  85,777,426 ns/iter (+/- 9,432,243)
+robust::long_degenerate_cyclic::precheck_equiv      ... bench:  86,969,685 ns/iter (+/- 10,483,774)
+robust::long_degenerate_dag::equiv                  ... bench:  85,901,175 ns/iter (+/- 11,394,270)
+robust::long_degenerate_dag::precheck_equiv         ... bench:  86,267,721 ns/iter (+/- 8,334,810)
 ```
 
 These shapes are degenerate pair-chains but their depth is `2^18` which is the same as the length
@@ -403,57 +371,48 @@ required.  For `cycle_safe`, the depth would cause stack-overflow crash.
 
 While the amount of recursions is the same as `basic::degenerate_dag` and `deep_safe::long_list`,
 the "interleave" mode stays in its "slow" phase for all recursions, like `cycle_safe`.  This is
-why the `recursion/ns` speed is `3%` as fast as `basic` and `deep_safe`.  That is the trade-off
+why the `recursion/ns` speed is `2%` as fast as `basic` and `deep_safe`.  That is the trade-off
 for the ability to handle these very-deep degenerate shapes which all other variants cannot.
-
-It is currently unexplained why the speed of the `precheck_equiv` cases was slightly faster than
-the `equiv` cases, when the additional effort of the "precheck" mode is always wasted for these
-shapes.
 
 ---
 
 ```
-robust::long_inverted_list::equiv                   ... bench:  12,539,428 ns/iter (+/- 1,318,153)
-robust::long_inverted_list::precheck_equiv          ... bench:  11,193,337 ns/iter (+/- 972,868)
-robust::long_list::equiv                            ... bench:   8,377,566 ns/iter (+/- 628,553)
-robust::long_list::precheck_equiv                   ... bench:  12,078,208 ns/iter (+/- 996,303)
+robust::long_inverted_list::equiv                   ... bench:   5,027,901 ns/iter (+/- 707,067)
+robust::long_inverted_list::precheck_equiv          ... bench:   5,072,338 ns/iter (+/- 894,887)
+robust::long_list::equiv                            ... bench:   5,085,048 ns/iter (+/- 1,121,376)
+robust::long_list::precheck_equiv                   ... bench:   5,243,630 ns/iter (+/- 1,437,008)
 ```
 
-These cases, with a length of `2^18`, do `2^19` recursions, on a vector stack, like
+These cases, with a length of `2^18`, do `2^19` recursions, on a vector queue, like
 `deep_safe::long`.
 
 The "interleave" mode is used with about `10%` "slow" phase and about `90%` "fast" phase, like
-`cycle_safe`, but unlike `deep_safe`.  This is why these cases are about half as fast as those of
-`deep_safe::long`, but are still much faster than the `robust::long_degenerate` cases, which all
-have the same amount of recursions.
-
-The benefit from the kind of "tail-call elimination" with a vector stack is why the
-`long_list::equiv` case is faster than the `long_inverted_list::equiv`, like the `deep_safe::long`
-cases.
+`cycle_safe`, but unlike `deep_safe`.  This is why these cases are much slower than the
+`deep_safe::long` cases, but are still much faster than the `robust::long_degenerate` cases, which
+all have the same amount of recursions.
 
 ---
 
 ```
-robust::short_degenerate_cyclic::equiv              ... bench:       1,371 ns/iter (+/- 32)
-robust::short_degenerate_cyclic::precheck_equiv     ... bench:       3,463 ns/iter (+/- 147)
-robust::short_degenerate_dag::equiv                 ... bench:       1,303 ns/iter (+/- 35)
-robust::short_degenerate_dag::precheck_equiv        ... bench:       1,514 ns/iter (+/- 22)
+robust::short_degenerate_cyclic::equiv              ... bench:       1,256 ns/iter (+/- 55)
+robust::short_degenerate_cyclic::precheck_equiv     ... bench:       2,660 ns/iter (+/- 119)
+robust::short_degenerate_dag::equiv                 ... bench:       1,193 ns/iter (+/- 49)
+robust::short_degenerate_dag::precheck_equiv        ... bench:         779 ns/iter (+/- 29)
 ```
 
 These cases, with a depth of `7`, do only `14` recursions for the `equiv` cases, like
 `cycle_safe`, and unlike `basic` and `deep_safe` (which do `254`).
 
 These cases are as fast as `cycle_safe::short_degenerate`, as expected, since they involve the
-same aspects other than `robust` using a vector stack (which happens to reduce the cost of the
-wasted prechecks by a little).
+same aspects other than `robust` using a vector queue.
 
 ---
 
 ```
-robust::short_inverted_list::equiv                  ... bench:       3,704 ns/iter (+/- 208)
-robust::short_inverted_list::precheck_equiv         ... bench:       1,205 ns/iter (+/- 50)
-robust::short_list::equiv                           ... bench:       3,647 ns/iter (+/- 283)
-robust::short_list::precheck_equiv                  ... bench:       1,157 ns/iter (+/- 29)
+robust::short_inverted_list::equiv                  ... bench:       5,058 ns/iter (+/- 103)
+robust::short_inverted_list::precheck_equiv         ... bench:         548 ns/iter (+/- 29)
+robust::short_list::equiv                           ... bench:       5,277 ns/iter (+/- 227)
+robust::short_list::precheck_equiv                  ... bench:         541 ns/iter (+/- 8)
 ```
 
 These cases, with a length of `100`, do `200` recursions, like the other variants.
@@ -462,20 +421,92 @@ The `equiv` cases use the "interleave" mode and so involve the "slow" phase alon
 phase, and so are slower, as expected, like the `cycle_safe::short` cases.
 
 The `precheck_equiv` cases are faster because they are able to complete the "precheck" mode on
-these small short shapes.  They are also faster than `basic::short` and `cycle_safe::short` due to
-using a vector stack.  This shows the purpose of the "precheck" mode: to be fast for small acyclic
-inputs while still being able to handle cyclic, degenerate, large, and deep inputs while not
-wasting too much effort.
+these small short shapes, and are as fast as `basic::short` and `cycle_safe::short`, as expected.
+This shows the purpose of the "precheck" mode: to be fast for small acyclic inputs while still
+being able to handle cyclic, degenerate, large, and deep inputs while not wasting too much effort.
 
 ---
 
 ```
-derived_eq::degenerate_dag::eq                      ... bench:   1,178,313 ns/iter (+/- 75,761)
-derived_eq::inverted_list::eq                       ... bench:      88,380 ns/iter (+/- 29,681)
-derived_eq::list::eq                                ... bench:      74,408 ns/iter (+/- 7,253)
-derived_eq::short_degenerate_dag::eq                ... bench:         564 ns/iter (+/- 11)
-derived_eq::short_inverted_list::eq                 ... bench:         752 ns/iter (+/- 114)
-derived_eq::short_list::eq                          ... bench:         448 ns/iter (+/- 11)
+wide_safe::degenerate_dag::equiv                    ... bench:   1,202,406 ns/iter (+/- 46,288)
+```
+
+The wide-safe variants do not use the normal call-stack and instead use a vector as a stack of
+which nodes to continue recurring on.
+
+The `wide_safe` cases, like the basic variant, do not detect shared structure, and so must do
+`2^(depth+1)-2` recursions for the `degenerate_dag` graph shape.  With a depth of `18`, `2^19 - 2`
+recursions are done.
+
+The vector stack is `119%` as fast as the call-stack, comparing this case to
+`basic::degenerate_dag::equiv`.
+
+---
+
+```
+wide_safe::inverted_list::equiv                     ... bench:      36,674 ns/iter (+/- 2,574)
+wide_safe::list::equiv                              ... bench:      40,830 ns/iter (+/- 1,895)
+```
+
+Like the basic variant, the wide-safe variants do `2*length` recursions for lists.
+
+These cases, with a length of `8,000`, do `16,000` recursions, on a vector stack.
+
+The vector stack is `129%` as fast as the call-stack, comparing these cases to the
+`basic::list::equiv` and `basic::inverted_list::equiv` cases.
+
+---
+
+```
+wide_safe::long_inverted_list::equiv                ... bench:   1,579,051 ns/iter (+/- 261,512)
+wide_safe::long_list::equiv                         ... bench:   1,392,088 ns/iter (+/- 166,487)
+```
+
+These cases, with a length of `2^18`, do `2^19` recursions, on a vector stack.
+
+The same amount of recursions is done as the `degenerate_dag` cases, and the `recursion/ns` speed
+is approx. the same as `wide_safe::degenerate_dag::equiv` and `basic::degenerate_dag::equiv`.
+
+The `long_list` benefits from a kind of "tail-call elimination" because it descends its list
+elements, which are leaf nodes, before descending its list tails, and so the maximum amount of
+items on its vector stack should be only `1`.  Whereas, `long_inverted_list` descends its list
+tails before its list elements, and so the maximum amount of items on its vector stack should be
+the same as its length of `2^18`, which is why it is slower.
+
+---
+
+```
+wide_safe::short_degenerate_dag::equiv              ... bench:         644 ns/iter (+/- 24)
+```
+
+This case, with a depth of `7`, does `254` (`2^8 - 2`) recursions, like the basic variant, but on
+a vector stack, unlike the basic variant.
+
+The vector stack is approx. as fast as the call-stack, comparing this case to
+`basic::short_degenerate_dag::equiv`.
+
+---
+
+```
+wide_safe::short_inverted_list::equiv               ... bench:         542 ns/iter (+/- 18)
+wide_safe::short_list::equiv                        ... bench:         445 ns/iter (+/- 20)
+```
+
+These cases, with a length of `100`, do `200` recursions, like the basic variant, but on a vector
+stack, unlike the basic variant.
+
+The vector stack is approx. as fast as the call-stack, comparing these cases to
+`basic::short_list::equiv` and `basic::short_inverted_list::equiv`.
+
+---
+
+```
+derived_eq::degenerate_dag::eq                      ... bench:     524,942 ns/iter (+/- 27,098)
+derived_eq::inverted_list::eq                       ... bench:      19,226 ns/iter (+/- 1,382)
+derived_eq::list::eq                                ... bench:      14,950 ns/iter (+/- 1,000)
+derived_eq::short_degenerate_dag::eq                ... bench:         239 ns/iter (+/- 12)
+derived_eq::short_inverted_list::eq                 ... bench:         193 ns/iter (+/- 2)
+derived_eq::short_list::eq                          ... bench:         189 ns/iter (+/- 3)
 ```
 
 The common `derive`d `PartialEq` is faster than all of the other variants, for the limited shapes
