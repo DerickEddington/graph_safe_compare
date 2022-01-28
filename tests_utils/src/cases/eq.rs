@@ -336,7 +336,7 @@ macro_rules! eq_variations_tests
         {
             use super::*;
 
-            mod interleave_vecstack
+            mod interleave_vecqueue
             {
                 $crate::eq_variation_mod_body!(
                     graph_safe_compare::robust::equiv,
@@ -346,7 +346,7 @@ macro_rules! eq_variations_tests
                                          #[cfg(all())], #[cfg(all())]);
             }
 
-            mod precheck_interleave_vecstack
+            mod precheck_interleave_vecqueue
             {
                 $crate::eq_variation_mod_body!(
                     graph_safe_compare::robust::precheck_equiv,
@@ -434,7 +434,7 @@ macro_rules! eq_variations_tests
                 cmp.is_equiv()
             }
 
-            mod precheck_interleave_callstack_vecstack
+            mod precheck_interleave_callstack_vecqueue
             {
                 $crate::eq_variation_mod_body!(
                     super::precheck_interleave_equiv,
