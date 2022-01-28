@@ -141,7 +141,8 @@ The `ignored` tests can be run to demonstrate the limitations of variations that
 do not support some shapes, and are expected to either cause stack overflow
 crashes or to take a very long time.
 
-There is a package that tests using the crate as `no_std`, which can be run by doing:
+There is a package that tests using the crate as `no_std`, which can be run by
+doing:
 
 ```shell
 cd test_no_std
