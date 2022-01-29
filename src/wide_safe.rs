@@ -8,7 +8,14 @@ mod premade
             VecStack,
         },
         crate::{
-            basic::modes::unlimited::Unlimited,
+            basic::modes::{
+                limited::{
+                    LimitReached,
+                    Limited,
+                    Ticker,
+                },
+                unlimited::Unlimited,
+            },
             generic::equiv::{
                 self,
                 Equiv,
@@ -46,6 +53,38 @@ mod premade
 
         let mut e = Equiv::<Args<N>>::default();
         e.equiv(a, b).into_ok()
+    }
+
+    /// Equivalence predicate that limits how many nodes are traversed, and that aborts early if
+    /// the limit is reached.  Like [`equiv`](equiv()), this can handle very-wide graphs but not
+    /// cyclic graphs.
+    ///
+    /// # Errors
+    /// If the limit is reached before completing, return `Err(LimitReached)`.
+    #[inline]
+    pub fn limited_equiv<N: Node, L: Ticker>(
+        limit: L,
+        a: N,
+        b: N,
+    ) -> Result<N::Cmp, LimitReached>
+    {
+        struct Args<N, L>(PhantomData<(N, L)>);
+
+        impl<N: Node, L: Ticker> equiv::Params for Args<N, L>
+        {
+            type DescendMode = Limited<L>;
+            type Error = LimitReached;
+            type Node = N;
+            type RecurMode = VecStack<Self>;
+        }
+
+        impl<N: Node, L: Ticker> vecstack::Params for Args<N, L>
+        {
+            type Node = N;
+        }
+
+        let mut e = Equiv::<Args<N, L>>::new(Limited(limit));
+        e.equiv(a, b)
     }
 }
 

@@ -211,11 +211,13 @@ pub mod modes
             impl Ticker for usize {}
         }
 
-        pub(in super::super) use sealed::Ticker;
-
-        use crate::generic::equiv::{
-            self,
-            DescendMode,
+        pub(crate) use sealed::Ticker;
+        use {
+            crate::generic::equiv::{
+                self,
+                DescendMode,
+            },
+            core::convert::Infallible,
         };
 
         /// Specifies limiting the amount of nodes traversed.  The inner value is the limit.
@@ -226,6 +228,18 @@ pub mod modes
         #[derive(Debug)]
         #[allow(clippy::exhaustive_structs)]
         pub struct LimitReached;
+
+        /// Enables `P: equiv::Params<Error = LimitReached, RecurMode = R>`
+        /// where `R: RecurMode<Error = Infallible>`.
+        impl From<Infallible> for LimitReached
+        {
+            #[inline]
+            fn from(_: Infallible) -> Self
+            {
+                #![allow(clippy::unreachable)] // Truly unreachable.
+                unreachable!()
+            }
+        }
 
         /// Enables [`Limited`] to be used with the algorithm.
         impl<T, P> DescendMode<P> for Limited<T>

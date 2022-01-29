@@ -257,7 +257,7 @@ macro_rules! eq_variations_tests
             {
                 use graph_safe_compare::Cmp as _;
 
-                const LIMIT: u32 = 50;
+                const LIMIT: u32 = u32::MAX;
                 matches!(graph_safe_compare::basic::limited_equiv(LIMIT, a, b),
                          Ok(cmp) if cmp.is_equiv())
             }
@@ -313,6 +313,28 @@ macro_rules! eq_variations_tests
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
                                          #[ignore], #[cfg(all())]);
             }
+
+            fn limited_equiv<N: graph_safe_compare::Node>(
+                a: N,
+                b: N,
+            ) -> bool
+            {
+                use graph_safe_compare::Cmp as _;
+
+                const LIMIT: u64 = u64::MAX;
+                matches!(graph_safe_compare::deep_safe::limited_equiv(LIMIT, a, b),
+                         Ok(cmp) if cmp.is_equiv())
+            }
+
+            mod limited
+            {
+                $crate::eq_variation_mod_body!(
+                    super::limited_equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[ignore], #[cfg(all())]);
+            }
         }
 
         #[cfg(test)]
@@ -324,6 +346,28 @@ macro_rules! eq_variations_tests
             {
                 $crate::eq_variation_mod_body!(
                     graph_safe_compare::wide_safe::equiv,
+                    $my_type, $datum_type, $alloc_trans, $make_alloc);
+
+                $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,
+                                         #[ignore], #[cfg(all())]);
+            }
+
+            fn limited_equiv<N: graph_safe_compare::Node>(
+                a: N,
+                b: N,
+            ) -> bool
+            {
+                use graph_safe_compare::Cmp as _;
+
+                const LIMIT: u128 = u128::MAX;
+                matches!(graph_safe_compare::wide_safe::limited_equiv(LIMIT, a, b),
+                         Ok(cmp) if cmp.is_equiv())
+            }
+
+            mod limited
+            {
+                $crate::eq_variation_mod_body!(
+                    super::limited_equiv,
                     $my_type, $datum_type, $alloc_trans, $make_alloc);
 
                 $crate::eq_shapes_tests!($alloc_trans, $make_alloc, MyEq::new,

@@ -254,7 +254,7 @@ variation! {
         short_inverted_list,
         short_degenerate_dag
     ],
-    [equiv]
+    [equiv, limited_equiv(limit = u32::MAX)]
 }
 
 #[cfg(feature = "alloc")]
@@ -270,7 +270,7 @@ variation! {
         short_inverted_list,
         short_degenerate_dag
     ],
-    [equiv]
+    [equiv, limited_equiv(limit = u64::MAX)]
 }
 
 #[cfg(feature = "std")]
