@@ -34,6 +34,38 @@ mod into_ok
             self.expect("infallible")
         }
     }
+
+    #[cfg(test)]
+    mod tests
+    {
+        use core::convert::Infallible;
+
+        trait IntoOk
+        {
+            fn into_ok(self) -> bool;
+        }
+
+        impl IntoOk for Result<bool, Infallible>
+        {
+            /// Changes the value, unlike the `unwrap_infallible` feature, so that use of this
+            /// test implementation can be differentiated and detected.
+            fn into_ok(self) -> bool
+            {
+                assert!(matches!(self, Ok(false)));
+                true
+            }
+        }
+
+        /// Will fail when the `unwrap_infallible` feature is stabilized, because the inherent
+        /// method will then be used instead of our test trait method.  Then the `into_ok` module
+        /// should be removed.
+        #[test]
+        fn not_yet_stabilized()
+        {
+            let r: Result<bool, Infallible> = Ok(false);
+            assert!(r.into_ok());
+        }
+    }
 }
 
 mod ref_id
