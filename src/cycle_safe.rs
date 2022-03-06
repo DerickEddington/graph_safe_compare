@@ -59,6 +59,7 @@ mod premade
         }
 
         let mut e = Equiv::<Args<N>>::default();
+        #[allow(unstable_name_collisions)]
         e.equiv(a, b).into_ok()
     }
 
@@ -79,6 +80,7 @@ mod premade
             type PrecheckRecurMode = CallStack;
         }
 
+        #[allow(unstable_name_collisions)]
         precheck_interleave::equiv::<N, Args<N>>(a, b).into_ok()
     }
 }

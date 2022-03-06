@@ -52,6 +52,7 @@ mod premade
         }
 
         let mut e = Equiv::<Args<N>>::default();
+        #[allow(unstable_name_collisions)]
         e.equiv(a, b).into_ok()
     }
 

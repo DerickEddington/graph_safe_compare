@@ -6,8 +6,9 @@ pub use {
 
 mod into_ok
 {
-    // FUTURE: This should be removed and its use should be replaced with the unstable
-    // `unwrap_infallible` feature, if that is ever stabilized.
+    //! FUTURE: This should be removed and its use should be replaced with the `unwrap_infallible`
+    //! feature, if that is ever stabilized.  And the `#[allow(unstable_name_collisions)]` that
+    //! are applied to calls of `IntoOk::into_ok` should also be removed.
 
     use core::convert::Infallible;
 
@@ -63,7 +64,9 @@ mod into_ok
         fn not_yet_stabilized()
         {
             let r: Result<bool, Infallible> = Ok(false);
-            assert!(r.into_ok());
+            #[allow(unstable_name_collisions)]
+            let ok = r.into_ok();
+            assert!(ok);
         }
     }
 }
