@@ -283,14 +283,18 @@ mod recursion
 /// The central parts of the algorithm.
 pub mod equiv
 {
+    use {
+        crate::{
+            utils::RangeIter,
+            Cmp,
+            Node,
+        },
+        core::ops::Range,
+    };
+
     pub use super::{
         modes::DescendMode,
         recursion::RecurMode,
-    };
-    use crate::{
-        utils::RangeIter,
-        Cmp,
-        Node,
     };
 
     /// Generic parameters of [`Equiv`] and its operations.
@@ -487,7 +491,7 @@ pub mod equiv
             counterparts: (N, N),
         ) -> Self
         {
-            Self { counterparts, index_iter: RangeIter(0.into() .. amount) }
+            Self { counterparts, index_iter: RangeIter::from(0.into() .. amount) }
         }
 
         /// Returns `true` if the iterator is empty.
@@ -498,7 +502,9 @@ pub mod equiv
         #[inline]
         pub fn is_empty(&self) -> bool
         {
-            let range = &self.index_iter.0;
+            use core::borrow::Borrow as _;
+
+            let range: &Range<_> = self.index_iter.borrow();
             range.start >= range.end
         }
     }

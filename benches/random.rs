@@ -1,5 +1,9 @@
-#![cfg(any(feature = "fastrand", feature = "oorandom", feature = "wyrng"))]
-#![feature(test)]
+#![cfg(all(
+    any(rust_lib_feature = "test", rust_comp_feature = "unstable_features"),
+    any(feature = "fastrand", feature = "oorandom", feature = "wyrng")
+))]
+#![cfg_attr(not(rust_lib_feature = "test"), feature(test))]
+
 extern crate test;
 
 use {

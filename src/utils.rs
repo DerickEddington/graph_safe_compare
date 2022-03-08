@@ -13,6 +13,7 @@ mod into_ok
     use core::convert::Infallible;
 
     /// Only for certain multi-variant types that can only be their "ok" variant.
+    #[cfg_attr(rust_lib_feature = "unwrap_infallible", deprecated)]
     pub trait IntoOk
     {
         /// Contained in the "ok" variant.
@@ -24,6 +25,7 @@ mod into_ok
         fn into_ok(self) -> Self::T;
     }
 
+    #[cfg(not(rust_lib_feature = "unwrap_infallible"))]
     impl<T> IntoOk for Result<T, Infallible>
     {
         type T = T;
@@ -33,40 +35,6 @@ mod into_ok
         {
             #![allow(clippy::expect_used)] // Truly infallible.
             self.expect("infallible")
-        }
-    }
-
-    #[cfg(test)]
-    mod tests
-    {
-        use core::convert::Infallible;
-
-        trait IntoOk
-        {
-            fn into_ok(self) -> bool;
-        }
-
-        impl IntoOk for Result<bool, Infallible>
-        {
-            /// Changes the value, unlike the `unwrap_infallible` feature, so that use of this
-            /// test implementation can be differentiated and detected.
-            fn into_ok(self) -> bool
-            {
-                assert!(matches!(self, Ok(false)));
-                true
-            }
-        }
-
-        /// Will fail when the `unwrap_infallible` feature is stabilized, because the inherent
-        /// method will then be used instead of our test trait method.  Then the `into_ok` module
-        /// should be removed.
-        #[test]
-        fn not_yet_stabilized()
-        {
-            let r: Result<bool, Infallible> = Ok(false);
-            #[allow(unstable_name_collisions)]
-            let ok = r.into_ok();
-            assert!(ok);
         }
     }
 }
@@ -197,22 +165,60 @@ mod ref_id
     }
 }
 
+#[rustfmt::skip] // This unusual formatting preserves lines for cleaner diffs.
 mod range_iter
 {
-    // FUTURE: This should be removed and its use should be replaced with the `impl<A: Step>
-    // DoubleEndedIterator for Range<A>` (along with `Iterator::rev`) of `core`, if the unstable
-    // `step_trait` feature is stabilized so that our generic custom index types can `impl` `Step`
-    // to be used with it in `Range<Index>`.
+    //! FUTURE: This should be removed and its use should be replaced with the `impl<A: Step>
+    //! DoubleEndedIterator for Range<A>` (along with `Iterator::rev`) of `core`, if the unstable
+    //! `step_trait` feature is stabilized so that our generic custom index types can `impl`
+    //! `Step` to be used with it in `Range<Index>`.
 
-    use core::ops::{
-        AddAssign,
-        Range,
-        SubAssign,
+    use cfg_if::cfg_if;
+
+cfg_if!
+{
+if #[cfg(rust_lib_feature = "step_trait")]
+{
+    use core::ops::Range;
+
+    /// Alias of generic [`Range`] that can be iterated with the new "step_trait" feature of the
+    /// Standard Library, for backwards compatibility with the code that uses our `RangeIter`
+    /// workaround type.
+    #[deprecated]
+    pub type RangeIter<T> = Range<T>;
+}
+else
+{
+    use core::{
+        borrow::Borrow,
+        ops::{
+            AddAssign,
+            Range,
+            SubAssign,
+        }
     };
 
     /// Enables iteration of a generic [`Range`].
     #[allow(clippy::exhaustive_structs)]
     pub struct RangeIter<T>(pub Range<T>);
+
+    impl<T> From<Range<T>> for RangeIter<T>
+    {
+        #[inline]
+        fn from(range: Range<T>) -> Self
+        {
+            Self(range)
+        }
+    }
+
+    impl<T> Borrow<Range<T>> for RangeIter<T>
+    {
+        #[inline]
+        fn borrow(&self) -> &Range<T>
+        {
+            &self.0
+        }
+    }
 
     /// Yields in increasing order.
     impl<T> Iterator for RangeIter<T>
@@ -244,4 +250,6 @@ mod range_iter
             })
         }
     }
+}
+}
 }

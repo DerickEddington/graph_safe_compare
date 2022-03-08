@@ -4,6 +4,7 @@ use {
         Leaf,
         Pair,
     },
+    cfg_if::cfg_if,
     std::{
         cell::{
             Cell,
@@ -124,6 +125,41 @@ impl SubAssign for Index
     {
         *self = Index::from((*self as u8).saturating_sub(rhs as u8));
     }
+}
+
+#[rustfmt::skip] // This unusual formatting preserves lines for cleaner diffs.
+cfg_if! {
+if #[cfg(rust_lib_feature = "step_trait")]
+{
+use core::iter::Step;
+
+impl Step for Index
+{
+    fn steps_between(
+        start: &Self,
+        end: &Self,
+    ) -> Option<usize>
+    {
+        <u8 as Step>::steps_between(&(*start as u8), &(*end as u8))
+    }
+
+    fn forward_checked(
+        start: Self,
+        count: usize,
+    ) -> Option<Self>
+    {
+        <u8 as Step>::forward_checked(start as u8, count).map(Self::from)
+    }
+
+    fn backward_checked(
+        start: Self,
+        count: usize,
+    ) -> Option<Self>
+    {
+        <u8 as Step>::backward_checked(start as u8, count).map(Self::from)
+    }
+}
+}
 }
 
 

@@ -1,6 +1,6 @@
 [package]
 name = "graph_safe_compare"
-version = "0.1.1"
+version = "0.1.2"
 description = "Equivalence predicate that can handle cyclic, shared, and very-deep graphs."
 authors = ["Derick Eddington"]
 license = "Unlicense"
@@ -39,6 +39,10 @@ wyhash = { version = "0.5", optional = true }
 
 [dev-dependencies]
 tests_utils = { path = "tests_utils" }
+
+[build-dependencies]
+autocfg = "1"
+version_check = "0.9"
 
 [[example]]
 name = "derived_eq"

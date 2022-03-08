@@ -1,4 +1,6 @@
-#![feature(test)]
+#![cfg(any(rust_lib_feature = "test", rust_comp_feature = "unstable_features"))]
+#![cfg_attr(not(rust_lib_feature = "test"), feature(test))]
+
 extern crate test;
 
 
