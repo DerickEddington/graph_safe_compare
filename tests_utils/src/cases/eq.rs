@@ -430,7 +430,6 @@ macro_rules! eq_variations_tests
                             equiv_classes::premade::hash_map,
                         },
                         Cmp as _,
-                        utils::IntoOk as _,
                     },
                     core::{
                         convert::Infallible,
@@ -475,7 +474,7 @@ macro_rules! eq_variations_tests
                 }
 
                 #[allow(unstable_name_collisions)]
-                let cmp = precheck_interleave::equiv::<_, Args<_>>(a, b).into_ok();
+                let cmp = precheck_interleave::equiv::<_, Args<_>>(a, b).unwrap();
                 cmp.is_equiv()
             }
 

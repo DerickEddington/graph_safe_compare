@@ -92,6 +92,10 @@ pub mod generic;
 /// Miscellaneous utilities that are sometimes useful.
 pub mod utils;
 
+/// Workarounds, that work with stable versions of Rust, that provide functionality like
+/// anticipated unstable features.
+mod like_unstable;
+
 
 #[cfg(rust_lib_feature = "step_trait")]
 use core::iter::Step;

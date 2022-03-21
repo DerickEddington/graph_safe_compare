@@ -17,7 +17,7 @@ use {
             equiv_classes::premade::hash_map,
             precheck_interleave,
         },
-        utils::IntoOk as _,
+        like_unstable::IntoOk as _,
         Node,
     },
     core::{

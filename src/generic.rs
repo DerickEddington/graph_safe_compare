@@ -285,7 +285,7 @@ pub mod equiv
 {
     use {
         crate::{
-            utils::RangeIter,
+            like_unstable::RangeIter,
             Cmp,
             Node,
         },

@@ -10,10 +10,7 @@ use {
             precheck_interleave,
         },
         robust,
-        utils::{
-            IntoOk as _,
-            RefId,
-        },
+        utils::RefId,
         Node,
     },
     std::{
@@ -71,7 +68,7 @@ impl PartialEq for My
             }
 
             #[allow(unstable_name_collisions)]
-            precheck_interleave::equiv::<_, Args>(self.clone(), other.clone()).into_ok()
+            precheck_interleave::equiv::<_, Args>(self.clone(), other.clone()).unwrap()
         };
         let robust = robust::precheck_equiv(self.clone(), other.clone());
         assert_eq!(callstack, robust);
