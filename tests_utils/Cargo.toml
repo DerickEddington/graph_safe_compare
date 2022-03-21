@@ -14,5 +14,4 @@ keywords = ["unpublished"]
 cfg-if = "1"
 
 [build-dependencies]
-autocfg = "1"
-version_check = "0.9"
+cfg_rust_features = "0.1"

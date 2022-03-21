@@ -41,8 +41,7 @@ wyhash = { version = "0.5", optional = true }
 tests_utils = { path = "tests_utils" }
 
 [build-dependencies]
-autocfg = "1"
-version_check = "0.9"
+cfg_rust_features = "0.1"
 
 [[example]]
 name = "derived_eq"
