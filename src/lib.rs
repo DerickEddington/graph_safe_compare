@@ -133,8 +133,9 @@ use core::{
 
 /// What the algorithm requires from a type, to be applied to it.
 ///
-/// The `Self` type is passed by owned value because that simplifies this crate.  It is possible,
-/// and sometimes recommended, to `impl` this trait on reference types (e.g. `&N`, `Rc<N>`, etc.)
+/// The `Self` type is passed by value because that simplifies this crate.  It is possible, and
+/// sometimes recommended, to `impl` this trait for reference types (e.g. `&N`, `Rc<N>`, etc.)
+/// which often can be passed by value more readily.
 pub trait Node
 {
     /// Result of comparing nodes.  Common choices are [`bool`] or [`Ordering`], but it may be
