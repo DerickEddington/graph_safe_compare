@@ -8,6 +8,7 @@ mod premade
             VecQueue,
         },
         crate::{
+            anticipated_or_like::Infallible,
             basic::modes::{
                 limited::{
                     LimitReached,
@@ -20,14 +21,13 @@ mod premade
                 self,
                 Equiv,
             },
-            like_unstable::IntoOk as _,
             Node,
         },
-        core::{
-            convert::Infallible,
-            marker::PhantomData,
-        },
+        core::marker::PhantomData,
     };
+
+    #[cfg(not(feature = "anticipate"))]
+    use crate::like_anticipated::IntoOk as _;
 
     /// Equivalence predicate that can handle very-deep graphs but not cyclic graphs.
     #[inline]
@@ -103,6 +103,7 @@ pub mod recursion
 
         use {
             crate::{
+                anticipated_or_like::Infallible,
                 basic::recursion::callstack::CallStack,
                 generic::equiv::{
                     self,
@@ -114,7 +115,6 @@ pub mod recursion
                 Node,
             },
             alloc::collections::VecDeque,
-            core::convert::Infallible,
         };
 
         /// Generic parameters of [`VecQueue`] and its operations.

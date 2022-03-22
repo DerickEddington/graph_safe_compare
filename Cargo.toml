@@ -21,6 +21,7 @@ default = ["std", "wyrng"]
 std = ["alloc"]
 alloc = []
 wyrng = ["wyhash"]
+anticipate = []  # Causes breaking changes, to use different Rust features.
 
 [dependencies]
 cfg-if = "1"

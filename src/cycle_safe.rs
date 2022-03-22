@@ -11,6 +11,7 @@ mod premade
             Interleave,
         },
         crate::{
+            anticipated_or_like::Infallible,
             basic::recursion::callstack::CallStack,
             generic::{
                 equiv::{
@@ -20,14 +21,13 @@ mod premade
                 equiv_classes::premade::hash_map,
                 precheck_interleave,
             },
-            like_unstable::IntoOk as _,
             Node,
         },
-        core::{
-            convert::Infallible,
-            marker::PhantomData,
-        },
+        core::marker::PhantomData,
     };
+
+    #[cfg(not(feature = "anticipate"))]
+    use crate::like_anticipated::IntoOk as _;
 
     struct Args<N>(PhantomData<N>);
 
@@ -99,6 +99,7 @@ pub mod modes
 
         use {
             crate::{
+                anticipated_or_like::Infallible,
                 generic::{
                     equiv::{
                         self,
@@ -111,10 +112,7 @@ pub mod modes
                 },
                 Node,
             },
-            core::{
-                convert::Infallible,
-                num::NonZeroU16,
-            },
+            core::num::NonZeroU16,
             random::NumberGenerator as _,
         };
 

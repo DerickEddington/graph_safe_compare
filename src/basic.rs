@@ -15,18 +15,18 @@ mod premade
             recursion::callstack::CallStack,
         },
         crate::{
+            anticipated_or_like::Infallible,
             generic::equiv::{
                 self,
                 Equiv,
             },
-            like_unstable::IntoOk as _,
             Node,
         },
-        core::{
-            convert::Infallible,
-            marker::PhantomData,
-        },
+        core::marker::PhantomData,
     };
+
+    #[cfg(not(feature = "anticipate"))]
+    use crate::like_anticipated::IntoOk as _;
 
 
     /// Equivalence predicate that cannot handle cyclic nor very-deep graphs, and that has the
@@ -154,12 +154,12 @@ pub mod modes
     /// Do not limit the algorithm in how many nodes are traversed, and never abort early.
     pub mod unlimited
     {
-        use {
-            crate::generic::equiv::{
+        use crate::{
+            anticipated_or_like::Infallible,
+            generic::equiv::{
                 self,
                 DescendMode,
             },
-            core::convert::Infallible,
         };
 
         /// Specifies not limiting the amount of nodes traversed.
@@ -213,12 +213,13 @@ pub mod modes
         }
 
         pub(crate) use sealed::Ticker;
-        use {
-            crate::generic::equiv::{
+
+        use crate::{
+            anticipated_or_like::Infallible,
+            generic::equiv::{
                 self,
                 DescendMode,
             },
-            core::convert::Infallible,
         };
 
         /// Specifies limiting the amount of nodes traversed.  The inner value is the limit.

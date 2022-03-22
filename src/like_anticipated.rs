@@ -1,5 +1,6 @@
 pub use step::Step;
 pub(crate) use {
+    core::convert::Infallible,
     into_ok::IntoOk,
     range_iter::RangeIter,
 };

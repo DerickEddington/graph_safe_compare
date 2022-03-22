@@ -92,6 +92,9 @@ impl Default for Index
 
 impl Index
 {
+    pub const MAX: Self = Index::Seven;
+    pub const MIN: Self = Index::Zero;
+
     pub fn increment(&self) -> Self
     {
         match self {
@@ -103,6 +106,20 @@ impl Index
             Index::Five => Index::Six,
             Index::Six => Index::Seven,
             Index::Seven => panic!(),
+        }
+    }
+
+    pub fn decrement(&self) -> Self
+    {
+        match self {
+            Index::Zero => panic!(),
+            Index::One => Index::Zero,
+            Index::Two => Index::One,
+            Index::Three => Index::Two,
+            Index::Four => Index::Three,
+            Index::Five => Index::Four,
+            Index::Six => Index::Five,
+            Index::Seven => Index::Six,
         }
     }
 }

@@ -61,6 +61,22 @@
     clippy::pattern_type_mismatch,
     clippy::shadow_reuse
 )]
+// When our package-feature "anticipate" is activated, cause breaking changes to our API that use
+// Rust-features that our crate anticipates adopting in a future version if they become stable.
+// While unstable, they must be enabled here; or if some become stable, they will already be
+// enabled.
+#![cfg_attr(
+    all(feature = "anticipate", not(rust_lib_feature = "step_trait")),
+    feature(step_trait)
+)]
+#![cfg_attr(
+    all(feature = "anticipate", not(rust_lib_feature = "unwrap_infallible")),
+    feature(unwrap_infallible)
+)]
+#![cfg_attr(
+    all(feature = "anticipate", not(rust_lang_feature = "never_type")),
+    feature(never_type)
+)]
 
 
 #[cfg(feature = "std")]
@@ -92,16 +108,27 @@ pub mod generic;
 /// Miscellaneous utilities that are sometimes useful.
 pub mod utils;
 
-/// Workarounds, that work with stable versions of Rust, that provide functionality similar to
-/// unstable features that this crate anticipates using once stable.
-mod like_unstable;
+cfg_if::cfg_if! {
+    if #[cfg(feature = "anticipate")] {
+        /// Use of anticipated Rust features.
+        mod anticipated;
+        use anticipated as anticipated_or_like;
+        use core::iter::Step;
+    }
+    else {
+        /// Workarounds, that work with stable versions of Rust, that provide functionality
+        /// similar to unstable features that this crate anticipates using once stable.
+        mod like_anticipated;
+        use like_anticipated as anticipated_or_like;
+        pub use like_anticipated::Step;
+    }
+}
+
 
 use core::{
     cmp::Ordering,
     hash::Hash,
 };
-
-pub use like_unstable::Step;
 
 
 /// What the algorithm requires from a type, to be applied to it.

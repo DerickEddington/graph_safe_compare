@@ -1,5 +1,6 @@
 use {
     crate::{
+        anticipated_or_like::Infallible,
         cycle_safe::modes::interleave::{
             self,
             random::default,
@@ -17,14 +18,13 @@ use {
             equiv_classes::premade::hash_map,
             precheck_interleave,
         },
-        like_unstable::IntoOk as _,
         Node,
     },
-    core::{
-        convert::Infallible,
-        marker::PhantomData,
-    },
+    core::marker::PhantomData,
 };
+
+#[cfg(not(feature = "anticipate"))]
+use crate::like_anticipated::IntoOk as _;
 
 
 struct Args<N>(PhantomData<N>);

@@ -51,13 +51,12 @@ mod premade
 
         mod errors
         {
-            use {
-                crate::basic::modes::limited::LimitReached,
-                core::convert::Infallible,
-            };
-
             #[cfg(doc)]
             use super::super::precheck_interleave;
+            use crate::{
+                anticipated_or_like::Infallible,
+                basic::modes::limited::LimitReached,
+            };
 
             /// Variants of errors that can occur while doing a precheck.
             #[allow(clippy::exhaustive_enums)]
@@ -285,7 +284,7 @@ pub mod equiv
 {
     use {
         crate::{
-            like_unstable::RangeIter,
+            anticipated_or_like::RangeIter,
             Cmp,
             Node,
         },

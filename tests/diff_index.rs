@@ -1,4 +1,10 @@
+#![cfg_attr(
+    all(feature = "anticipate", not(rust_lib_feature = "step_trait")),
+    feature(step_trait)
+)]
+
 use {
+    cfg_if::cfg_if,
     graph_safe_compare::{
         basic::recursion::callstack::CallStack,
         cycle_safe::modes::interleave::{
@@ -12,7 +18,6 @@ use {
         robust,
         utils::RefId,
         Node,
-        Step,
     },
     std::{
         cell::RefCell,
@@ -41,11 +46,42 @@ use {
 #[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Default)]
 struct Index(tests_utils::node_types::diff_index::Index);
 
-impl Step for Index
-{
-    fn increment(&self) -> Self
+cfg_if! {
+    if #[cfg(feature = "anticipate")]
     {
-        Self(self.0.increment())
+        impl Index
+        {
+            const MAX: Self = Self(tests_utils::node_types::diff_index::Index::MAX);
+            const MIN: Self = Self(tests_utils::node_types::diff_index::Index::MIN);
+        }
+
+        impl core::iter::Step for Index
+        {
+            fn steps_between(start: &Self, end: &Self) -> Option<usize> {
+                let mut between = 0;
+                let mut cur = start.0;
+                while cur < end.0 { between += 1; cur = cur.increment(); }
+                (start <= end).then(|| between)
+            }
+            fn forward_checked(start: Self, count: usize) -> Option<Self> {
+                Self::steps_between(&start, &Self::MAX)
+                    .map_or(false, |between| count <= between)
+                    .then(|| Self((0 .. count).fold(start.0, |index, _| index.increment())))
+            }
+            fn backward_checked(start: Self, count: usize) -> Option<Self> {
+                Self::steps_between(&Self::MIN, &start)
+                    .map_or(false, |between| count <= between)
+                    .then(|| Self((0 .. count).fold(start.0, |index, _| index.decrement())))
+            }
+        }
+    }
+    else {
+        impl graph_safe_compare::Step for Index
+        {
+            fn increment(&self) -> Self {
+                Self(self.0.increment())
+            }
+        }
     }
 }
 
