@@ -9,9 +9,3 @@ readme = "README.md"
 repository = "https://github.com/DerickEddington/graph_safe_compare"
 categories = ["development-tools::testing"]
 keywords = ["unpublished"]
-
-[dependencies]
-cfg-if = "1"
-
-[build-dependencies]
-cfg_rust_features = "0.1"

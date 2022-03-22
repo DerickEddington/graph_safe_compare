@@ -4,17 +4,12 @@ use {
         Leaf,
         Pair,
     },
-    cfg_if::cfg_if,
     std::{
         cell::{
             Cell,
             Ref,
             RefCell,
             RefMut,
-        },
-        ops::{
-            AddAssign,
-            SubAssign,
         },
         rc::Rc,
     },
@@ -87,81 +82,30 @@ pub enum Index
     Seven,
 }
 
-impl From<u8> for Index
+impl Default for Index
 {
-    fn from(n: u8) -> Self
+    fn default() -> Self
     {
-        match n {
-            0 => Index::Zero,
-            1 => Index::One,
-            2 => Index::Two,
-            3 => Index::Three,
-            4 => Index::Four,
-            5 => Index::Five,
-            6 => Index::Six,
-            7 => Index::Seven,
-            _ => panic!("invalid"),
+        Self::Zero
+    }
+}
+
+impl Index
+{
+    pub fn increment(&self) -> Self
+    {
+        match self {
+            Index::Zero => Index::One,
+            Index::One => Index::Two,
+            Index::Two => Index::Three,
+            Index::Three => Index::Four,
+            Index::Four => Index::Five,
+            Index::Five => Index::Six,
+            Index::Six => Index::Seven,
+            Index::Seven => panic!(),
         }
     }
 }
-
-impl AddAssign for Index
-{
-    fn add_assign(
-        &mut self,
-        rhs: Self,
-    )
-    {
-        *self = Index::from((*self as u8).saturating_add(rhs as u8));
-    }
-}
-
-impl SubAssign for Index
-{
-    fn sub_assign(
-        &mut self,
-        rhs: Self,
-    )
-    {
-        *self = Index::from((*self as u8).saturating_sub(rhs as u8));
-    }
-}
-
-#[rustfmt::skip] // This unusual formatting preserves lines for cleaner diffs.
-cfg_if! {
-if #[cfg(rust_lib_feature = "step_trait")]
-{
-use core::iter::Step;
-
-impl Step for Index
-{
-    fn steps_between(
-        start: &Self,
-        end: &Self,
-    ) -> Option<usize>
-    {
-        <u8 as Step>::steps_between(&(*start as u8), &(*end as u8))
-    }
-
-    fn forward_checked(
-        start: Self,
-        count: usize,
-    ) -> Option<Self>
-    {
-        <u8 as Step>::forward_checked(start as u8, count).map(Self::from)
-    }
-
-    fn backward_checked(
-        start: Self,
-        count: usize,
-    ) -> Option<Self>
-    {
-        <u8 as Step>::backward_checked(start as u8, count).map(Self::from)
-    }
-}
-}
-}
-
 
 impl Leaf for Datum
 {
@@ -198,7 +142,7 @@ impl Pair for Datum
 pub struct DatumAllocator
 {
     region: Region,
-    next:   Cell<u8>,
+    next:   Cell<Option<Index>>,
 }
 
 impl DatumAllocator
@@ -209,7 +153,7 @@ impl DatumAllocator
         let size = size.try_into().unwrap();
         let mut vec = Vec::with_capacity(size);
         vec.resize(size, RefCell::new(Inner::default()));
-        Self { region: vec.into(), next: Cell::new(0) }
+        Self { region: vec.into(), next: Cell::new(Some(Index::Zero)) }
     }
 }
 
@@ -217,8 +161,8 @@ impl Allocator<Datum> for DatumAllocator
 {
     fn alloc(&self) -> Datum
     {
-        let i = self.next.get();
-        self.next.set(i + 1);
-        Datum { index: i.into(), region: Rc::clone(&self.region) }
+        let index = self.next.get().unwrap();
+        self.next.set((index < Index::Seven).then(|| index.increment()));
+        Datum { index, region: Rc::clone(&self.region) }
     }
 }

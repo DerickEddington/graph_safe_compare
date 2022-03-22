@@ -382,6 +382,13 @@ pub mod equiv
         }
     }
 
+    /// [`Node::Index`] types must give their "zero" value, for their implementation of
+    /// [`Default`].
+    fn zero<T: Default>() -> T
+    {
+        T::default()
+    }
+
     /// The primary logic of the algorithm.
     ///
     /// This generic design works with the [`Node`], [`DescendMode`], and [`RecurMode`] traits to
@@ -463,7 +470,7 @@ pub mod equiv
 
             if try_into!(self.descend_mode.do_traverse()) && a.id() != b.id() {
                 let amount_edges = try_cmp!(a.equiv_modulo_descendents_then_amount_edges(&b));
-                if amount_edges > 0.into() && try_into!(self.descend_mode.do_edges(&a, &b)) {
+                if amount_edges > zero() && try_into!(self.descend_mode.do_edges(&a, &b)) {
                     let edges_iter = EdgesIter::new(amount_edges, (a, b));
                     return P::RecurMode::recur(self, edges_iter).map_err(Into::into);
                 }
@@ -491,7 +498,7 @@ pub mod equiv
             counterparts: (N, N),
         ) -> Self
         {
-            Self { counterparts, index_iter: RangeIter::from(0.into() .. amount) }
+            Self { counterparts, index_iter: RangeIter::from(zero() .. amount) }
         }
 
         /// Returns `true` if the iterator is empty.

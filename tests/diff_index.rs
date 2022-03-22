@@ -12,6 +12,7 @@ use {
         robust,
         utils::RefId,
         Node,
+        Step,
     },
     std::{
         cell::RefCell,
@@ -25,12 +26,28 @@ use {
         node_types::diff_index::{
             Datum,
             DatumAllocator,
-            Index,
+            Index::{
+                One,
+                Two,
+                Zero,
+            },
             Inner,
         },
         shapes::Leaf,
     },
 };
+
+
+#[derive(Hash, Eq, PartialEq, Ord, PartialOrd, Clone, Default)]
+struct Index(tests_utils::node_types::diff_index::Index);
+
+impl Step for Index
+{
+    fn increment(&self) -> Self
+    {
+        Self(self.0.increment())
+    }
+}
 
 
 /// New type needed so we can impl the `Node` and `PartialEq` traits on it.
@@ -84,15 +101,15 @@ impl Node for My
 
     fn id(&self) -> Self::Id
     {
-        (self.0.index, RefId(Rc::clone(&self.0.region)))
+        (Index(self.0.index), RefId(Rc::clone(&self.0.region)))
     }
 
     fn amount_edges(&self) -> Self::Index
     {
-        match *self.0.deref() {
-            Inner::Leaf => Index::Zero,
-            Inner::Pair(_, _) => Index::Two,
-        }
+        Index(match *self.0.deref() {
+            Inner::Leaf => Zero,
+            Inner::Pair(_, _) => Two,
+        })
     }
 
     fn get_edge(
@@ -100,9 +117,9 @@ impl Node for My
         idx: &Self::Index,
     ) -> Self
     {
-        match (idx, &*self.0.deref()) {
-            (Index::Zero, Inner::Pair(a, _)) => My(a.clone()),
-            (Index::One, Inner::Pair(_, b)) => My(b.clone()),
+        match (idx.0, &*self.0.deref()) {
+            (Zero, Inner::Pair(a, _)) => My(a.clone()),
+            (One, Inner::Pair(_, b)) => My(b.clone()),
             _ => panic!("invalid"),
         }
     }

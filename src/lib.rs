@@ -92,62 +92,16 @@ pub mod generic;
 /// Miscellaneous utilities that are sometimes useful.
 pub mod utils;
 
-/// Workarounds, that work with stable versions of Rust, that provide functionality like
-/// anticipated unstable features.
+/// Workarounds, that work with stable versions of Rust, that provide functionality similar to
+/// unstable features that this crate anticipates using once stable.
 mod like_unstable;
 
-
-#[cfg(rust_lib_feature = "step_trait")]
-use core::iter::Step;
-
-use {
-    cfg_if::cfg_if,
-    core::{
-        cmp::Ordering,
-        hash::Hash,
-        ops::{
-            AddAssign,
-            SubAssign,
-        },
-    },
+use core::{
+    cmp::Ordering,
+    hash::Hash,
 };
 
-
-/// Helps apply a single doc-comment to multiple items.
-macro_rules! cfg_if_assoc_type {
-    {
-        $(#[$doc:meta])+
-        cfg_if!
-        {
-        if #[cfg($pred:meta)]
-        {
-            $(#[$doc_if:meta])*
-            type $name_if:ident: $($bounds_if:tt)+
-        }
-        else
-        {
-            $(#[$doc_else:meta])*
-            type $name_else:ident: $($bounds_else:tt)+
-        }
-        }
-    } => {
-        cfg_if!
-        {
-        if #[cfg($pred)]
-        {
-            $(#[$doc])+
-            $(#[$doc_if])*
-            type $name_if: $($bounds_if)+
-        }
-        else
-        {
-            $(#[$doc])+
-            $(#[$doc_else])*
-            type $name_else: $($bounds_else)+
-        }
-        }
-    };
-}
+pub use like_unstable::Step;
 
 
 /// What the algorithm requires from a type, to be applied to it.
@@ -182,9 +136,6 @@ pub trait Node
     /// approach following that should be provided, and `RefId` should not be used.
     type Id: Eq + Hash + Clone;
 
-    #[rustfmt::skip] // This unusual formatting preserves lines for cleaner diffs.
-cfg_if_assoc_type!
-{
     /// Determines what is used to index descendent nodes and to represent the amount of them.
     /// The primitive unsigned integer types, like `usize`, are a common choice, but it may be
     /// anything that satisfies the trait bounds.
@@ -194,25 +145,8 @@ cfg_if_assoc_type!
     /// other node types, it might be more logical or convenient to use an index type that is not
     /// a number.
     ///
-cfg_if!
-{
-if #[cfg(rust_lib_feature = "step_trait")]
-{
-    /// Only `Self::Index::from(0)` and `Self::Index::from(1)` are actually used by the crate, and
-    /// so the type does not actually have to support `From<u8>` for the rest of the `u8` range.
-    type Index: Eq + Ord + Step + From<u8>;
-}
-else
-{
-    /// Only `Self::Index::from(0)`, `Self::Index::from(1)`, `Self::Index::add_assign(index,
-    /// 1.into())`, and `Self::Index::sub_assign(index, 1.into())` are actually used by the crate,
-    /// and so the type does not actually have to support `From<u8>` for the rest of the `u8`
-    /// range, and does not actually have to support `AddAssign` and `SubAssign` of other than the
-    /// unit value nor of results beyond the maximum possible amount of edges.
-    type Index: Eq + Ord + AddAssign + SubAssign + From<u8> + Clone;
-}
-}
-}
+    /// This type's implementation of `Default` must give the "zero" value of this type.
+    type Index: Step + Default + Ord;
 
     /// Get the identity of the `self` node.  The result must only be `==` to another node's when
     /// the nodes should be considered identical.

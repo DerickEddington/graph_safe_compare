@@ -1,7 +1,9 @@
+pub use step::Step;
 pub(crate) use {
     into_ok::IntoOk,
     range_iter::RangeIter,
 };
+
 
 mod into_ok
 {
@@ -38,40 +40,67 @@ mod into_ok
     }
 }
 
-#[rustfmt::skip] // This unusual formatting preserves lines for cleaner diffs.
+
+mod step
+{
+    //! FUTURE: This should be removed, if the unstable `step_trait` feature is stabilized.  Doing
+    //! that will be a breaking change involving a version increase.
+
+    /// Increments [`Node::Index`](crate::Node::Index) types.
+    ///
+    /// Will be deprecated in favor of the `step_trait` feature if that is stabilized.  The `Step`
+    /// trait of that feature is different, and so when this crate changes to require that it will
+    /// be a breaking change involving a version increase of this crate.
+    #[cfg_attr(rust_lib_feature = "step_trait", deprecated)]
+    pub trait Step
+    {
+        /// Return the incremented value of `self`.
+        ///
+        /// Only called when it is guaranteed to not overflow, i.e. when it is already known that
+        /// there is a greater value.
+        #[must_use]
+        fn increment(&self) -> Self;
+    }
+
+    macro_rules! provided_impls
+    {
+        { $($t:ty)* } => {
+            $(
+                impl Step for $t
+                {
+                    #[allow(clippy::integer_arithmetic)]
+                    #[inline]
+                    fn increment(&self) -> Self
+                    {
+                        self + 1
+                    }
+                }
+            )*
+        }
+    }
+
+    provided_impls! { u8 i8 u16 i16 u32 i32 u64 i64 u128 i128 usize isize }
+}
+
+
 mod range_iter
 {
     //! FUTURE: This should be removed and its use should be replaced with the `impl<A: Step>
-    //! DoubleEndedIterator for Range<A>` (along with `Iterator::rev`) of `core`, if the unstable
-    //! `step_trait` feature is stabilized so that our generic custom index types can `impl`
-    //! `Step` to be used with it in `Range<Index>`.
+    //! Iterator for Range<A>` of `core`, if the unstable `step_trait` feature is stabilized, so
+    //! that our generic custom index types can `impl` `core::iter::Step` so that `Range<Index>`
+    //! can be used instead of `RangeIter`.
 
-    use cfg_if::cfg_if;
-
-cfg_if!
-{
-if #[cfg(rust_lib_feature = "step_trait")]
-{
-    use core::ops::Range;
-
-    /// Alias of generic [`Range`] that can be iterated with the new "step_trait" feature of the
-    /// Standard Library, for backwards compatibility with the code that uses our `RangeIter`
-    /// workaround type.
-    #[deprecated]
-    pub(crate) type RangeIter<T> = Range<T>;
-}
-else
-{
-    use core::{
-        borrow::Borrow,
-        ops::{
-            AddAssign,
-            Range,
-            SubAssign,
-        }
+    use {
+        super::Step,
+        core::{
+            borrow::Borrow,
+            mem,
+            ops::Range,
+        },
     };
 
     /// Enables iteration of a generic [`Range`].
+    #[cfg_attr(rust_lib_feature = "step_trait", deprecated)]
     #[allow(clippy::exhaustive_structs)]
     pub(crate) struct RangeIter<T>(Range<T>);
 
@@ -95,7 +124,7 @@ else
 
     /// Yields in increasing order.
     impl<T> Iterator for RangeIter<T>
-    where T: Ord + Clone + From<u8> + AddAssign
+    where T: Step + Ord
     {
         type Item = T;
 
@@ -103,26 +132,9 @@ else
         fn next(&mut self) -> Option<Self::Item>
         {
             (self.0.start < self.0.end).then(|| {
-                let next = self.0.start.clone();
-                self.0.start += 1.into();
-                next
+                let incr = self.0.start.increment();
+                mem::replace(&mut self.0.start, incr)
             })
         }
     }
-
-    /// Yields in decreasing order.
-    impl<T> DoubleEndedIterator for RangeIter<T>
-    where T: Ord + From<u8> + SubAssign + Clone + AddAssign
-    {
-        #[inline]
-        fn next_back(&mut self) -> Option<Self::Item>
-        {
-            (self.0.start < self.0.end).then(|| {
-                self.0.end -= 1.into();
-                self.0.end.clone()
-            })
-        }
-    }
-}
-}
 }
