@@ -1,5 +1,6 @@
 [package]
 name = "test_no_std"
+publish = false
 version = "0.0.0"
 edition = "2021"
 description = "Integration tests of using the package in the parent directory as `no_std`."

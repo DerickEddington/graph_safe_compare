@@ -1,5 +1,6 @@
 [package]
 name = "tests_utils"
+publish = false
 version = "0.0.0"
 edition = "2021"
 # The below are only defined to silence the clippy::cargo lint.
