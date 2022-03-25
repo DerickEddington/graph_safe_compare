@@ -1,0 +1,17 @@
+# Exists to help when editing the ../README.md examples as temporary targets in
+# this examples/ directory.
+
+unstable_features = true
+version = "Two"
+edition = "2021"
+max_width = 80
+comment_width = 80
+use_small_heuristics = "Max"
+imports_layout = "Horizontal"
+imports_indent = "Visual"
+imports_granularity = "Crate"
+fn_single_line = true
+struct_lit_single_line = true
+match_arm_blocks = false
+overflow_delimited_expr = true
+use_field_init_shorthand = true

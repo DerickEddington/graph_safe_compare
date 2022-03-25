@@ -18,26 +18,39 @@ execute inefficiently when given inputs that have much shared structure.
 This crate provides functions that are safe and efficient for general shapes of
 graphs, that can be used as `PartialEq` `impl`ementations.
 
-## Example
+## Examples
+
+<details><summary>Degenerate D.A.G. Shape</summary>
+
+A chain where each pair of `left` and `right` edges of a `My::Branch` reference
+the same next `Rc<My>` node.  Without shared-structure detection, it would be
+traversed like a perfect binary tree with `2^(depth+1)-2` recursions, but with
+the shared-structure detection of this crate, it is traversed with only
+`2*depth` recursions.
 
 ```rust
-use graph_safe_compare::{robust::equiv, Node, utils::RefId};
+use graph_safe_compare::{robust, utils::RefId, Node};
+use std::rc::Rc;
+use My::*;
 
 #[derive(Eq)]
 enum My {
-    Leaf {
-        val: i32,
-    },
-    Branch {
-        left: Box<Self>,
-        right: Box<Self>,
-    },
+    Leaf { val: i32 },
+    Branch { left: Rc<Self>, right: Rc<Self> },
+}
+
+impl My {
+    fn new_degenerate_shared_structure(depth: usize) -> Self {
+        let next = Leaf { val: 1 };
+        (0..depth).fold(next, |next, _| {
+            let next = Rc::new(next);
+            Branch { left: Rc::clone(&next), right: next }
+        })
+    }
 }
 
 impl PartialEq for My {
-    fn eq(&self, other: &Self) -> bool {
-        equiv(self, other)
-    }
+    fn eq(&self, other: &Self) -> bool { robust::equiv(self, other) }
 }
 
 impl Node for &My {
@@ -45,44 +58,180 @@ impl Node for &My {
     type Id = RefId<Self>;
     type Index = usize;
 
-    fn id(&self) -> Self::Id {
-        RefId(*self)
-    }
+    fn id(&self) -> Self::Id { RefId(*self) }
 
     fn amount_edges(&self) -> Self::Index {
         match self {
-            My::Leaf { .. } => 0,
-            My::Branch { .. } => 2,
+            Leaf { .. } => 0,
+            Branch { .. } => 2,
         }
     }
 
     fn get_edge(&self, index: &Self::Index) -> Self {
         match (self, index) {
-            (My::Branch { left, .. }, 0) => left,
-            (My::Branch { right, .. }, 1) => right,
+            (Branch { left, .. }, 0) => left,
+            (Branch { right, .. }, 1) => right,
             _ => unreachable!(),
         }
     }
 
     fn equiv_modulo_edges(&self, other: &Self) -> Self::Cmp {
         match (self, other) {
-            (My::Leaf { val: v1 }, My::Leaf { val: v2 }) => v1 == v2,
-            (My::Branch { .. }, My::Branch { .. }) => true,
+            (Leaf { val: v1 }, Leaf { val: v2 }) => v1 == v2,
+            (Branch { .. }, Branch { .. }) => true,
             _ => false,
         }
     }
 }
 
-let a = Box::new(My::Branch {
-    left: Box::new(My::Leaf { val: 1 }),
-    right: Box::new(My::Leaf { val: 2 }),
-});
-let b = Box::new(My::Branch {
-    left: Box::new(My::Leaf { val: 1 }),
-    right: Box::new(My::Leaf { val: 2 }),
-});
-assert!(a == b);
+fn main() {
+    // A depth that is fast with the `robust` variant of this crate, but that
+    // would be infeasible and either take forever, due to the great degree of
+    // shared structure, or cause stack overflow, due to the great depth, if
+    // another variant were used.
+    let depth = 1_000_000;
+    let a = My::new_degenerate_shared_structure(depth);
+    let b = My::new_degenerate_shared_structure(depth);
+    assert!(a == b);
+
+    // Prevent running the drop destructor, to avoid the stack overflow it would
+    // cause due to the great depth.  (A real implementation would need a `Drop`
+    // designed to properly avoid that.)
+    std::mem::forget((a, b));
+}
 ```
+</details>
+
+<details><summary>Cyclic Shape</summary>
+
+A very-simple cycle.  Without shared-structure detection, it would infinitely
+recurse and overflow the stack, but with the shared-structure detection of this
+crate, it does not and it completes efficiently.
+
+The types involved are more complicated, to be able to construct cycles.
+
+```rust
+use graph_safe_compare::{cycle_safe, utils::RefId, Node};
+use std::{cell::{Ref, RefCell}, rc::Rc};
+use Inner::*;
+
+#[derive(Clone)]
+struct My(Rc<RefCell<Inner>>);
+
+enum Inner {
+    Leaf { val: i32 },
+    Branch { left: My, right: My },
+}
+
+impl My {
+    fn leaf(val: i32) -> Self { My(Rc::new(RefCell::new(Leaf { val }))) }
+
+    fn set_branch(&self, left: My, right: My) {
+        *self.0.borrow_mut() = Branch { left, right };
+    }
+
+    fn new_cyclic_structure() -> Self {
+        let cyc = My::leaf(0);
+        cyc.set_branch(My::leaf(1), cyc.clone());
+        cyc
+    }
+
+    fn inner(&self) -> Ref<'_, Inner> { self.0.borrow() }
+}
+
+impl PartialEq for My {
+    fn eq(&self, other: &Self) -> bool {
+        cycle_safe::equiv(self.clone(), other.clone())
+    }
+}
+impl Eq for My {}
+
+impl Node for My {
+    type Cmp = bool;
+    type Id = RefId<Rc<RefCell<Inner>>>;
+    type Index = u32;
+
+    fn id(&self) -> Self::Id { RefId(Rc::clone(&self.0)) }
+
+    fn amount_edges(&self) -> Self::Index {
+        match &*self.inner() {
+            Leaf { .. } => 0,
+            Branch { .. } => 2,
+        }
+    }
+
+    fn get_edge(&self, index: &Self::Index) -> Self {
+        match (index, &*self.inner()) {
+            (0, Branch { left, .. }) => left.clone(),
+            (1, Branch { right, .. }) => right.clone(),
+            _ => unreachable!(),
+        }
+    }
+
+    fn equiv_modulo_edges(&self, other: &Self) -> Self::Cmp {
+        match (&*self.inner(), &*other.inner()) {
+            (Leaf { val: v1 }, Leaf { val: v2 }) => v1 == v2,
+            (Branch { .. }, Branch { .. }) => true,
+            _ => false,
+        }
+    }
+}
+
+fn main() {
+    let a = My::new_cyclic_structure();
+    let b = My::new_cyclic_structure();
+    assert!(a == b);
+
+    // (A real implementation would need to break the cycles, to allow them to
+    // be dropped.)
+}
+````
+</details>
+
+<details><summary>Multi-way Comparison for Ordering</summary>
+
+```rust
+use graph_safe_compare::{basic, utils::RefId, Node};
+use std::cmp::Ordering;
+
+#[derive(Eq)]
+struct My(Vec<i32>);
+
+impl Ord for My {
+    fn cmp(&self, other: &Self) -> Ordering { basic::equiv(self, other) }
+}
+impl PartialOrd for My {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl PartialEq for My {
+    fn eq(&self, other: &Self) -> bool { self.cmp(other).is_eq() }
+}
+
+impl Node for &My {
+    type Cmp = Ordering;
+    type Id = RefId<Self>;
+    type Index = u8;
+
+    fn id(&self) -> Self::Id { RefId(*self) }
+
+    fn amount_edges(&self) -> Self::Index { 0 }
+
+    fn get_edge(&self, _: &Self::Index) -> Self { unreachable!() }
+
+    fn equiv_modulo_edges(&self, other: &Self) -> Self::Cmp {
+        self.0.iter().cmp(other.0.iter())
+    }
+}
+
+fn main() {
+    let mut array = [My(vec![1, 2, 3]), My(vec![3]), My(vec![1, 2])];
+    array.sort();
+    assert!(array == [My(vec![1, 2]), My(vec![1, 2, 3]), My(vec![3])])
+}
+````
+</details>
 
 ## Design
 
