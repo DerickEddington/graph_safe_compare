@@ -115,6 +115,7 @@ mod custom_recur_stack
             basic::recursion::callstack::CallStack,
             generic::equiv::{
                 self,
+                CounterpartsResult,
                 EdgesIter,
                 Equiv,
                 RecurMode,
@@ -151,16 +152,14 @@ mod custom_recur_stack
             }
         }
 
-        fn next(&mut self) -> Option<(P::Node, P::Node)>
+        fn next(&mut self) -> Option<CounterpartsResult<P::Node>>
         {
             while let Some(edges_iter) = self.0.front_mut() {
-                if let next @ Some(_) = edges_iter.next() {
-                    if edges_iter.is_empty() {
-                        // Prevent empty iterators from staying on the stack.
-                        drop(self.0.pop_front());
-                    }
+                let next = edges_iter.next();
+                if next.is_some() {
                     return next;
                 }
+                // Remove empty iterators from the stack.
                 drop(self.0.pop_front());
             }
             None
@@ -198,6 +197,7 @@ mod other_recur_stack
         graph_safe_compare::{
             generic::equiv::{
                 self,
+                CounterpartsResult,
                 EdgesIter,
                 Equiv,
                 RecurMode,
@@ -230,10 +230,13 @@ mod other_recur_stack
         ) -> Result<<P::Node as Node>::Cmp, Self::Error>
         {
             if true {
-                for (a, b) in edges_iter {
-                    match it.equiv_main(a, b) {
-                        Ok(cmp) if cmp.is_equiv() => (),
-                        result => return result.map_err(OtherStackError::Recur),
+                for next in edges_iter {
+                    match next {
+                        Ok([a, b]) => match it.equiv_main(a, b) {
+                            Ok(cmp) if cmp.is_equiv() => (),
+                            result => return result.map_err(OtherStackError::Recur),
+                        },
+                        Err(cmp_amount_edges) => return Ok(cmp_amount_edges),
                     }
                 }
                 Ok(Cmp::new_equiv())
@@ -243,7 +246,7 @@ mod other_recur_stack
             }
         }
 
-        fn next(&mut self) -> Option<(P::Node, P::Node)>
+        fn next(&mut self) -> Option<CounterpartsResult<P::Node>>
         {
             None
         }

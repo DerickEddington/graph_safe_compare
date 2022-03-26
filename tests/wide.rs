@@ -33,17 +33,15 @@ impl<'l> Node for My<'l>
         RefId(self.0)
     }
 
-    fn amount_edges(&self) -> Self::Index
-    {
-        self.0.width()
-    }
-
     fn get_edge(
         &self,
         index: &Self::Index,
-    ) -> Self
+    ) -> Option<Self>
     {
-        My(&self.0[*index])
+        match self.0 {
+            Datum::Branch { width, .. } if index < width => Some(My(&self.0[*index])),
+            _ => None,
+        }
     }
 
     fn equiv_modulo_edges(

@@ -29,23 +29,15 @@ impl Node for My
         self.0.inner().id.clone()
     }
 
-    fn amount_edges(&self) -> Self::Index
-    {
-        match self.0.get_edges() {
-            Some((_, _)) => 2,
-            None => 0,
-        }
-    }
-
     fn get_edge(
         &self,
         index: &Self::Index,
-    ) -> Self
+    ) -> Option<Self>
     {
         match (self.0.get_edges(), index) {
-            (Some((a, _)), 0) => My(a),
-            (Some((_, b)), 1) => My(b),
-            _ => panic!("invalid"),
+            (Some((a, _)), 0) => Some(My(a)),
+            (Some((_, b)), 1) => Some(My(b)),
+            _ => None,
         }
     }
 

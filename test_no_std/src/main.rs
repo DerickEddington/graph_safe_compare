@@ -39,17 +39,12 @@ impl Node for It
         self.0
     }
 
-    fn amount_edges(&self) -> Self::Index
-    {
-        0
-    }
-
     fn get_edge(
         &self,
         _index: &Self::Index,
-    ) -> Self
+    ) -> Option<Self>
     {
-        unreachable!()
+        None
     }
 
     fn equiv_modulo_edges(

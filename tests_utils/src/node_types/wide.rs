@@ -46,6 +46,7 @@ impl Index<usize> for Datum
 {
     type Output = Rc<Self>;
 
+    #[inline]
     fn index(
         &self,
         index: usize,

@@ -69,24 +69,15 @@ impl Node for My
         }
     }
 
-    fn amount_edges(&self) -> Self::Index
-    {
-        match self {
-            My(Kind::A(a)) => a.amount_edges(),
-            My(Kind::B(b)) => b.amount_edges(),
-            My(Kind::C(c)) => c.amount_edges(),
-        }
-    }
-
     fn get_edge(
         &self,
         index: &Self::Index,
-    ) -> Self
+    ) -> Option<Self>
     {
         match self {
-            My(Kind::A(a)) => My(Kind::B(a.get_edge(index))),
-            My(Kind::B(b)) => My(Kind::C(b.get_edge(index))),
-            My(Kind::C(c)) => My(Kind::A(c.get_edge(index))),
+            My(Kind::A(a)) => a.get_edge(index).map(|e| My(Kind::B(e))),
+            My(Kind::B(b)) => b.get_edge(index).map(|e| My(Kind::C(e))),
+            My(Kind::C(c)) => c.get_edge(index).map(|e| My(Kind::A(e))),
         }
     }
 
@@ -111,22 +102,14 @@ impl My1
         RefId(Rc::clone(&self.0))
     }
 
-    fn amount_edges(&self) -> u16
-    {
-        match &*self.0 {
-            Datum1 { child: None } => 0,
-            Datum1 { child: Some(_) } => 1,
-        }
-    }
-
     fn get_edge(
         &self,
         idx: &u16,
-    ) -> My2
+    ) -> Option<My2>
     {
         match (idx, &*self.0) {
-            (0, Datum1 { child: Some(d2) }) => My2(Rc::clone(d2)),
-            _ => panic!("invalid"),
+            (0, Datum1 { child: Some(d2) }) => Some(My2(Rc::clone(d2))),
+            _ => None,
         }
     }
 
@@ -146,26 +129,18 @@ impl My2
         RefId(Rc::clone(&self.0))
     }
 
-    fn amount_edges(&self) -> u16
-    {
-        match &*self.0 {
-            Datum2::Double(_, _) => 2,
-            Datum2::Triple(_, _, _) => 3,
-        }
-    }
-
     fn get_edge(
         &self,
         idx: &u16,
-    ) -> My3
+    ) -> Option<My3>
     {
         match (idx, &*self.0) {
-            (0, Datum2::Double(d2a, _)) => My3(Rc::clone(d2a)),
-            (1, Datum2::Double(_, d2b)) => My3(Rc::clone(d2b)),
-            (0, Datum2::Triple(d2a, _, _)) => My3(Rc::clone(d2a)),
-            (1, Datum2::Triple(_, d2b, _)) => My3(Rc::clone(d2b)),
-            (2, Datum2::Triple(_, _, d2c)) => My3(Rc::clone(d2c)),
-            _ => panic!("invalid"),
+            (0, Datum2::Double(d2a, _)) => Some(My3(Rc::clone(d2a))),
+            (1, Datum2::Double(_, d2b)) => Some(My3(Rc::clone(d2b))),
+            (0, Datum2::Triple(d2a, _, _)) => Some(My3(Rc::clone(d2a))),
+            (1, Datum2::Triple(_, d2b, _)) => Some(My3(Rc::clone(d2b))),
+            (2, Datum2::Triple(_, _, d2c)) => Some(My3(Rc::clone(d2c))),
+            _ => None,
         }
     }
 
@@ -191,22 +166,14 @@ impl My3
         RefId(Rc::clone(&self.0))
     }
 
-    fn amount_edges(&self) -> u16
-    {
-        match &*self.0.0.borrow() {
-            Datum4::End => 0,
-            Datum4::Link(_) => 1,
-        }
-    }
-
     fn get_edge(
         &self,
         idx: &u16,
-    ) -> My1
+    ) -> Option<My1>
     {
         match (idx, &*self.0.0.borrow()) {
-            (0, Datum4::Link(d1)) => My1(Rc::clone(d1)),
-            _ => panic!("invalid"),
+            (0, Datum4::Link(d1)) => Some(My1(Rc::clone(d1))),
+            _ => None,
         }
     }
 

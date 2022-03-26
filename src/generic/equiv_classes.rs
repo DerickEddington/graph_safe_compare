@@ -546,15 +546,10 @@ mod tests
                 unreachable!()
             }
 
-            fn amount_edges(&self) -> Self::Index
-            {
-                unreachable!()
-            }
-
             fn get_edge(
                 &self,
                 _index: &Self::Index,
-            ) -> Self
+            ) -> Option<Self>
             {
                 unreachable!()
             }

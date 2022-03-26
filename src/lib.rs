@@ -136,7 +136,7 @@ use core::{
 /// The `Self` type is passed by value because that simplifies this crate.  It is possible, and
 /// sometimes recommended, to `impl` this trait for reference types (e.g. `&N`, `Rc<N>`, etc.)
 /// which often can be passed by value more readily.
-pub trait Node
+pub trait Node: Sized
 {
     /// Result of comparing nodes.  Common choices are [`bool`] or [`Ordering`], but it may be
     /// anything that satisfies the trait bounds.
@@ -180,28 +180,16 @@ pub trait Node
     /// the nodes should be considered identical.
     fn id(&self) -> Self::Id;
 
-    /// Determines how many edges the `self` node has that the algorithm will descend into and
-    /// check.  All indices in the range `0.into() .. self.amount_edges()` must be valid to call
-    /// [`self.get_edge(index)`](Self::get_edge) with.
-    fn amount_edges(&self) -> Self::Index;
-
-    /// Get descendent node by index.  The index must be within the range `0.into()
-    /// .. self.amount_edges()`.  The algorithm calls this method, for each index in that range,
-    /// to descend into each edge.
-    ///
-    /// # Panics
-    /// Panics if the index is out of bounds.  But since the same implementor controls
-    /// [`Self::amount_edges`], and when that is implemented correctly, as it must be, then such
-    /// out-of-bounds panics are impossible, as used by the algorithm.
+    /// Get descendent node by index, if `index` is within the range of the `self` node.  The
+    /// algorithm calls this method, until it returns `None`, to descend into each edge.
     #[must_use]
     fn get_edge(
         &self,
         index: &Self::Index,
-    ) -> Self;
+    ) -> Option<Self>;
 
     /// Check if the nodes are equivalent in their own directly-contained semantically-significant
-    /// values ignoring their edges and ignoring their descendent nodes.  This is intended to be
-    /// used by [`Self::equiv_modulo_descendents_then_amount_edges`].
+    /// values ignoring their edges and ignoring their descendent nodes.
     ///
     /// E.g. a node type like:
     ///
@@ -229,7 +217,7 @@ pub trait Node
     ///
     /// Requires that the implementor decide whether the difference between the `A` and `B`
     /// variants should affect comparison.  Either way is supported.  Since both variants have the
-    /// same amount of edges (assuming [`Self::amount_edges`] is implemented like that), the
+    /// same amount of edges (assuming [`Self::get_edge`] is implemented like that), the
     /// implementor could decide to always return "equivalent" to ignore differences in the
     /// variants and allow the algorithm to just compare the descendents, or the implementor could
     /// make the result correspond to whether the variants are the same or not.
@@ -243,56 +231,13 @@ pub trait Node
     /// }
     /// ```
     ///
-    /// It is sufficient to always return "equivalent", when [`Self::amount_edges`] returns
-    /// `0.into()` for the `A` variant or `1.into()` for the `B` variant, because that is used by
-    /// [`Self::equiv_modulo_descendents_then_amount_edges`] and the algorithm will detect the
+    /// It is sufficient to always return "equivalent", when [`Self::get_edge`] returns `None` for
+    /// the `A` variant or `Some` for the `B` variant, because the algorithm will detect the
     /// unequivalence that way instead.
     fn equiv_modulo_edges(
         &self,
         other: &Self,
     ) -> Self::Cmp;
-
-    /// Check if the nodes are equivalent in their own directly-contained semantically-significant
-    /// values ignoring their descendent nodes, and check if their amounts of edges are similar
-    /// enough that their descendents will need to be checked for equivalence.  If both conditions
-    /// are true, return the amount of edges that the algorithm should descend, else return the
-    /// inequivalence result of comparison.
-    ///
-    /// The implementor must use [`Self::equiv_modulo_edges`] and [`Self::amount_edges`] to check
-    /// the conditions, but may do so in any order.  This allows the implementation to optimize
-    /// the order to be the most efficient for its type.
-    ///
-    /// The implementor must ensure that an `Ok(result)` upholds: `self.amount_edges() >= result
-    /// && other.amount_edges() >= result`, so that there are enough descendents of each to
-    /// descend into.
-    ///
-    /// The default implementation checks that `self.amount_edges() == other.amount_edges()` and
-    /// `self.equiv_modulo_edges(other)`, in that order, and, when true, returns the amount of
-    /// edges.  This is intended for types where [`Self::amount_edges`] is cheaper than
-    /// [`Self::equiv_modulo_edges`] and so should be checked first, and where the nodes should be
-    /// considered unequivalent if their amounts of edges are not the same, and where all the
-    /// edges should be descended.  For types that do not want all of those aspects, a custom
-    /// implementation will need to be provided, and it must fulfill all the above requirements.
-    ///
-    /// # Errors
-    /// If the conditions are not both true, returns an `Err` with the value that represents the
-    /// inequivalence.
-    #[inline]
-    fn equiv_modulo_descendents_then_amount_edges(
-        &self,
-        other: &Self,
-    ) -> Result<Self::Index, Self::Cmp>
-    {
-        let (az, bz) = (self.amount_edges(), other.amount_edges());
-        let cmp_amount_edges = Self::Cmp::from_ord(az.cmp(&bz));
-        if cmp_amount_edges.is_equiv() {
-            let cmp_modulo_edges = self.equiv_modulo_edges(other);
-            if cmp_modulo_edges.is_equiv() { Ok(az) } else { Err(cmp_modulo_edges) }
-        }
-        else {
-            Err(cmp_amount_edges)
-        }
-    }
 }
 
 
@@ -309,8 +254,8 @@ pub trait Cmp
 
     /// Create a new value that most-accurately represents the given `Ordering` value.
     ///
-    /// Intended for representing comparisons of results of [`Node::amount_edges`], as returned by
-    /// the `Err` case of [`Node::equiv_modulo_descendents_then_amount_edges`].
+    /// Intended for representing comparisons of the amounts of edges of nodes, as checked by
+    /// [`EdgesIter::next`](crate::generic::equiv::EdgesIter::next).
     fn from_ord(ord: Ordering) -> Self;
 }
 

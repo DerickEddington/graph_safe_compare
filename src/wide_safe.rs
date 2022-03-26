@@ -107,6 +107,7 @@ pub mod recursion
                 basic::recursion::callstack::CallStack,
                 generic::equiv::{
                     self,
+                    CounterpartsResult,
                     EdgesIter,
                     Equiv,
                     RecurMode,
@@ -192,26 +193,22 @@ pub mod recursion
                 edges_iter: EdgesIter<E::Node>,
             ) -> Result<<E::Node as Node>::Cmp, Self::Error>
             {
-                debug_assert!(!edges_iter.is_empty());
                 it.recur_mode.0.push(edges_iter);
                 Ok(Cmp::new_equiv())
             }
 
             #[inline]
-            fn next(&mut self) -> Option<(E::Node, E::Node)>
+            fn next(&mut self) -> Option<CounterpartsResult<E::Node>>
             {
-                if let Some(edges_iter) = self.0.last_mut() {
+                while let Some(edges_iter) = self.0.last_mut() {
                     let next = edges_iter.next();
-                    if edges_iter.is_empty() {
-                        // Prevent empty iterators from staying on the stack.
-                        drop(self.0.pop());
+                    if next.is_some() {
+                        return next;
                     }
-                    debug_assert!(next.is_some());
-                    next
+                    // Remove empty iterators from the stack.
+                    drop(self.0.pop());
                 }
-                else {
-                    None
-                }
+                None
             }
 
             /// An aborted precheck, that uses `VecStack`, might have left some elements, so we

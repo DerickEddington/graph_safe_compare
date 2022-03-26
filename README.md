@@ -60,18 +60,11 @@ impl Node for &My {
 
     fn id(&self) -> Self::Id { RefId(*self) }
 
-    fn amount_edges(&self) -> Self::Index {
-        match self {
-            Leaf { .. } => 0,
-            Branch { .. } => 2,
-        }
-    }
-
-    fn get_edge(&self, index: &Self::Index) -> Self {
+    fn get_edge(&self, index: &Self::Index) -> Option<Self> {
         match (self, index) {
-            (Branch { left, .. }, 0) => left,
-            (Branch { right, .. }, 1) => right,
-            _ => unreachable!(),
+            (Branch { left, .. }, 0) => Some(left),
+            (Branch { right, .. }, 1) => Some(right),
+            _ => None,
         }
     }
 
@@ -153,18 +146,11 @@ impl Node for My {
 
     fn id(&self) -> Self::Id { RefId(Rc::clone(&self.0)) }
 
-    fn amount_edges(&self) -> Self::Index {
-        match &*self.inner() {
-            Leaf { .. } => 0,
-            Branch { .. } => 2,
-        }
-    }
-
-    fn get_edge(&self, index: &Self::Index) -> Self {
+    fn get_edge(&self, index: &Self::Index) -> Option<Self> {
         match (index, &*self.inner()) {
-            (0, Branch { left, .. }) => left.clone(),
-            (1, Branch { right, .. }) => right.clone(),
-            _ => unreachable!(),
+            (0, Branch { left, .. }) => Some(left.clone()),
+            (1, Branch { right, .. }) => Some(right.clone()),
+            _ => None,
         }
     }
 
@@ -216,9 +202,7 @@ impl Node for &My {
 
     fn id(&self) -> Self::Id { RefId(*self) }
 
-    fn amount_edges(&self) -> Self::Index { 0 }
-
-    fn get_edge(&self, _: &Self::Index) -> Self { unreachable!() }
+    fn get_edge(&self, _: &Self::Index) -> Option<Self> { None }
 
     fn equiv_modulo_edges(&self, other: &Self) -> Self::Cmp {
         self.0.iter().cmp(other.0.iter())

@@ -95,6 +95,7 @@ pub mod recursion
         use crate::{
             generic::equiv::{
                 self,
+                CounterpartsResult,
                 EdgesIter,
                 Equiv,
                 RecurMode,
@@ -122,17 +123,20 @@ pub mod recursion
                 edges_iter: EdgesIter<P::Node>,
             ) -> Result<<P::Node as Node>::Cmp, Self::Error>
             {
-                for (a, b) in edges_iter {
-                    match it.equiv_main(a, b) {
-                        Ok(cmp) if cmp.is_equiv() => (),
-                        result => return result,
+                for next in edges_iter {
+                    match next {
+                        Ok([a, b]) => match it.equiv_main(a, b) {
+                            Ok(cmp) if cmp.is_equiv() => (),
+                            result => return result,
+                        },
+                        Err(cmp_amount_edges) => return Ok(cmp_amount_edges),
                     }
                 }
                 Ok(Cmp::new_equiv())
             }
 
             #[inline]
-            fn next(&mut self) -> Option<(P::Node, P::Node)>
+            fn next(&mut self) -> Option<CounterpartsResult<P::Node>>
             {
                 None
             }
@@ -341,24 +345,15 @@ mod tests
             RefId(*self)
         }
 
-        fn amount_edges(&self) -> Self::Index
-        {
-            match self {
-                Datum::Leaf => 0,
-                Datum::Pair(_, _) => 2,
-            }
-        }
-
         fn get_edge(
             &self,
             idx: &Self::Index,
-        ) -> Self
+        ) -> Option<Self>
         {
             match (idx, self) {
-                #![allow(clippy::panic)]
-                (0, Datum::Pair(a, _)) => a,
-                (1, Datum::Pair(_, b)) => b,
-                _ => panic!("invalid"),
+                (0, Datum::Pair(a, _)) => Some(a),
+                (1, Datum::Pair(_, b)) => Some(b),
+                _ => None,
             }
         }
 

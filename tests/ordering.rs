@@ -38,32 +38,18 @@ impl<'l> Node for &'l Datum
         RefId(*self)
     }
 
-    fn amount_edges(&self) -> Self::Index
-    {
-        match self {
-            A => 0,
-            B => 0,
-            C(_) => 0,
-            D([None, None]) => 0,
-            D([None, Some(_)]) => 1,
-            D([Some(_), None]) => 1,
-            D([Some(_), Some(_)]) => 2,
-            E(v) => v.len(),
-        }
-    }
-
     fn get_edge(
         &self,
         index: &Self::Index,
-    ) -> Self
+    ) -> Option<Self>
     {
         match (self, index) {
-            (D([Some(d), None]), 0) => d,
-            (D([None, Some(d)]), 0) => d,
-            (D([Some(d), Some(_)]), 0) => d,
-            (D([Some(_), Some(d)]), 1) => d,
-            (E(v), &i) => &v[i],
-            _ => unimplemented!(),
+            (D([Some(d), None]), 0) => Some(d),
+            (D([None, Some(d)]), 0) => Some(d),
+            (D([Some(d), Some(_)]), 0) => Some(d),
+            (D([Some(_), Some(d)]), 1) => Some(d),
+            (E(v), &i) => v.get(i),
+            _ => None,
         }
     }
 
@@ -384,8 +370,8 @@ fn sorting()
                => [D([None, Some(b())]), D([Some(a()), None])]);
     sort_case!([E(vec![A]), E(vec![B])] => [E(vec![A]), E(vec![B])]);
     sort_case!([E(vec![B]), E(vec![A])] => [E(vec![A]), E(vec![B])]);
-    sort_case!([E(vec![B, B]), E(vec![A, A, A])] => [E(vec![B, B]), E(vec![A, A, A])]);
-    sort_case!([E(vec![A, A, A]), E(vec![B, B])] => [E(vec![B, B]), E(vec![A, A, A])]);
+    sort_case!([E(vec![B, B]), E(vec![A, A, A])] => [E(vec![A, A, A]), E(vec![B, B])]);
+    sort_case!([E(vec![A, A, A]), E(vec![B, B])] => [E(vec![A, A, A]), E(vec![B, B])]);
 
     sort_case!([E(vec![C('z'), A]), B, A, D([Some(c('z')), Some(a())]), C('y'), C('x'), A, B]
                => [A, A, B, B, C('x'), C('y'), E(vec![C('z'), A]), D([Some(c('z')), Some(a())])]);

@@ -186,7 +186,7 @@ mod modes
         type Error: Into<P::Error>;
 
         /// Controls if all the descendents of a pair of nodes being compared should be
-        /// immediately skipped.  Called before getting any edges.
+        /// immediately skipped.
         ///
         /// Returning `true` causes all the descendents to begin to be compared, individually
         /// under the control of [`Self::do_traverse`].
@@ -232,6 +232,12 @@ mod recursion
         crate::Node,
     };
 
+    /// Descendent [`Node`]s at the same position in the input graphs.
+    pub type Counterparts<N> = [N; 2];
+    /// `Ok` when there are [`Counterparts`] descendents from ancestors.  `Err` when ancestors do
+    /// not have the same amount of edges.
+    pub type CounterpartsResult<N> = Result<Counterparts<N>, <N as Node>::Cmp>;
+
     /// Abstraction of recursion continuations.
     pub trait RecurMode<P: Params>: Default
     {
@@ -260,7 +266,11 @@ mod recursion
 
         /// Supply the next counterpart nodes for the algorithm to compare, if any were saved for
         /// later by [`Self::recur`].
-        fn next(&mut self) -> Option<(P::Node, P::Node)>;
+        ///
+        /// # Errors
+        /// If there are not the same amount of counterparts (i.e. their ancestor nodes have
+        /// different amounts of edges), then `Err(cmp)` indicates which ancestor has less.
+        fn next(&mut self) -> Option<CounterpartsResult<P::Node>>;
 
         /// Reset to be empty while preserving capacity, if relevant.
         ///
@@ -284,16 +294,24 @@ pub mod equiv
 {
     use {
         crate::{
-            anticipated_or_like::RangeIter,
             Cmp,
             Node,
+            Step,
         },
-        core::ops::Range,
+        cfg_if::cfg_if,
+        core::{
+            cmp::Ordering,
+            iter,
+        },
     };
 
     pub use super::{
         modes::DescendMode,
-        recursion::RecurMode,
+        recursion::{
+            Counterparts,
+            CounterpartsResult,
+            RecurMode,
+        },
     };
 
     /// Generic parameters of [`Equiv`] and its operations.
@@ -381,13 +399,6 @@ pub mod equiv
         }
     }
 
-    /// [`Node::Index`] types must give their "zero" value, for their implementation of
-    /// [`Default`].
-    fn zero<T: Default>() -> T
-    {
-        T::default()
-    }
-
     /// The primary logic of the algorithm.
     ///
     /// This generic design works with the [`Node`], [`DescendMode`], and [`RecurMode`] traits to
@@ -417,10 +428,11 @@ pub mod equiv
             loop {
                 match self.equiv_main(a, b) {
                     Ok(cmp) if cmp.is_equiv() => match self.recur_mode.next() {
-                        Some((an, bn)) => {
+                        Some(Ok([an, bn])) => {
                             a = an;
                             b = bn;
                         },
+                        Some(Err(cmp_amount_edges)) => return Ok(cmp_amount_edges),
                         None => return Ok(cmp),
                     },
                     result => return result,
@@ -444,88 +456,133 @@ pub mod equiv
             b: P::Node,
         ) -> Result<<P::Node as Node>::Cmp, P::Error>
         {
-            macro_rules! try_ret {
-                ($result:path, $conv:path, $e:expr) => {
-                    match $e {
-                        Ok(v) => v,
-                        Err(e) => return $result($conv(e)),
-                    }
-                };
-            }
-            macro_rules! try_cmp {
-                ($e:expr) => {
-                    try_ret!(Ok, core::convert::identity, $e)
-                };
-            }
+            // Needed only because the `?` operator uses `From` instead of `Into`.
             macro_rules! try_into {
                 ($e:expr) => {
-                    try_ret!(Err, Into::into, $e)
+                    ($e).map_err(Into::into)?
                 };
             }
+
+            let mut cmp = Cmp::new_equiv();
 
             // For trait method implementations that always return the same constant, dead
             // branches should be eliminated by the optimizer.  For the other methods, inlining
             // should be doable by the optimizer.
 
             if try_into!(self.descend_mode.do_traverse()) && a.id() != b.id() {
-                let amount_edges = try_cmp!(a.equiv_modulo_descendents_then_amount_edges(&b));
-                if amount_edges > zero() && try_into!(self.descend_mode.do_edges(&a, &b)) {
-                    let edges_iter = EdgesIter::new(amount_edges, (a, b));
-                    return P::RecurMode::recur(self, edges_iter).map_err(Into::into);
+                cmp = a.equiv_modulo_edges(&b);
+                if cmp.is_equiv() {
+                    let mut edges_iter = EdgesIterTail::new([a, b]);
+                    match edges_iter.next() {
+                        Some(Ok(first)) => {
+                            #[allow(clippy::shadow_unrelated)]
+                            let [a, b] = &edges_iter.counterparts;
+                            if try_into!(self.descend_mode.do_edges(a, b)) {
+                                let edges_iter = EdgesIter::new(first, edges_iter);
+                                cmp = try_into!(P::RecurMode::recur(self, edges_iter));
+                            }
+                        },
+                        Some(Err(cmp_amount_edges)) => cmp = cmp_amount_edges,
+                        None => (),
+                    }
                 }
             }
 
-            Ok(Cmp::new_equiv())
+            Ok(cmp)
         }
+    }
+
+    /// [`Node::Index`] types must give their "zero" value, for their implementation of
+    /// [`Default`].
+    fn zero<T: Default>() -> T
+    {
+        T::default()
     }
 
     /// Get edges lazily, in increasing-index order.
     ///
     /// Enables avoiding consuming excessive space for `RecurMode` types like `VecStack`.
-    pub struct EdgesIter<N: Node>
-    {
-        counterparts: (N, N),
-        index_iter:   RangeIter<N::Index>,
-    }
+    pub struct EdgesIter<N: Node>(
+        iter::Chain<iter::Once<<Self as Iterator>::Item>, EdgesIterTail<N>>,
+    );
 
     impl<N: Node> EdgesIter<N>
     {
-        /// Prepare to get `amount` edges from `counterparts`.
-        #[inline]
-        pub fn new(
-            amount: N::Index,
-            counterparts: (N, N),
+        fn new(
+            first_edges: Counterparts<N>,
+            tail_iter: EdgesIterTail<N>,
         ) -> Self
         {
-            Self { counterparts, index_iter: RangeIter::from(zero() .. amount) }
-        }
-
-        /// Returns `true` if the iterator is empty.
-        ///
-        /// (This type does not `impl` `ExactSizeIterator` because that would impose more
-        /// requirements than needed.  Does not use `Range::is_empty` because that is not
-        /// `#[inline]`.)
-        #[inline]
-        pub fn is_empty(&self) -> bool
-        {
-            use core::borrow::Borrow as _;
-
-            let range: &Range<_> = self.index_iter.borrow();
-            range.start >= range.end
+            debug_assert!({
+                let one = increment_index(&zero());
+                tail_iter.next_index == one
+            });
+            Self(iter::once(Ok(first_edges)).chain(tail_iter))
         }
     }
 
     impl<N: Node> Iterator for EdgesIter<N>
     {
-        type Item = (N, N);
+        type Item = CounterpartsResult<N>;
 
         #[inline]
         fn next(&mut self) -> Option<Self::Item>
         {
-            self.index_iter.next().map(|i| {
-                let (a, b) = &self.counterparts;
-                (a.get_edge(&i), b.get_edge(&i))
-            })
+            self.0.next()
+        }
+    }
+
+    struct EdgesIterTail<N: Node>
+    {
+        counterparts: Counterparts<N>,
+        next_index:   Option<N::Index>,
+    }
+
+    impl<N: Node> EdgesIterTail<N>
+    {
+        /// Prepare to get the edges from `counterparts`.
+        fn new(counterparts: Counterparts<N>) -> Self
+        {
+            Self { counterparts, next_index: Some(zero()) }
+        }
+    }
+
+    impl<N: Node> Iterator for EdgesIterTail<N>
+    {
+        type Item = CounterpartsResult<N>;
+
+        fn next(&mut self) -> Option<Self::Item>
+        {
+            if let Some(i) = &self.next_index {
+                let [a, b] = &self.counterparts;
+                match [a.get_edge(i), b.get_edge(i)] {
+                    [Some(ae), Some(be)] => {
+                        self.next_index = increment_index(i);
+                        Some(Ok([ae, be]))
+                    },
+                    [None, None] => {
+                        self.next_index = None;
+                        None
+                    },
+                    [None, Some(_)] => Some(Err(N::Cmp::from_ord(Ordering::Less))),
+                    [Some(_), None] => Some(Err(N::Cmp::from_ord(Ordering::Greater))),
+                }
+            }
+            else {
+                None
+            }
+        }
+    }
+
+    fn increment_index<T: Step>(i: &T) -> Option<T>
+    {
+        cfg_if! {
+            if #[cfg(feature = "anticipate")] {
+                Step::forward_checked(i.clone(), 1)
+            }
+            else {
+                i.increment()
+            }
         }
     }
 }

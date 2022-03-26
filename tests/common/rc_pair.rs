@@ -26,23 +26,15 @@ impl Node for My
         RefId(Rc::clone(&self.0))
     }
 
-    fn amount_edges(&self) -> Self::Index
-    {
-        match &*self.0.0.borrow() {
-            None => 0,
-            Some((_, _)) => 2,
-        }
-    }
-
     fn get_edge(
         &self,
         idx: &Self::Index,
-    ) -> Self
+    ) -> Option<Self>
     {
         match (idx, &*self.0.0.borrow()) {
-            (0, Some((a, _))) => My(a.clone()),
-            (1, Some((_, b))) => My(b.clone()),
-            _ => panic!("invalid"),
+            (0, Some((a, _))) => Some(My(a.clone())),
+            (1, Some((_, b))) => Some(My(b.clone())),
+            _ => None,
         }
     }
 

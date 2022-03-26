@@ -95,31 +95,33 @@ impl Index
     pub const MAX: Self = Index::Seven;
     pub const MIN: Self = Index::Zero;
 
-    pub fn increment(&self) -> Self
+    #[inline]
+    pub fn increment(&self) -> Option<Self>
     {
         match self {
-            Index::Zero => Index::One,
-            Index::One => Index::Two,
-            Index::Two => Index::Three,
-            Index::Three => Index::Four,
-            Index::Four => Index::Five,
-            Index::Five => Index::Six,
-            Index::Six => Index::Seven,
-            Index::Seven => panic!(),
+            Index::Zero => Some(Index::One),
+            Index::One => Some(Index::Two),
+            Index::Two => Some(Index::Three),
+            Index::Three => Some(Index::Four),
+            Index::Four => Some(Index::Five),
+            Index::Five => Some(Index::Six),
+            Index::Six => Some(Index::Seven),
+            Index::Seven => None,
         }
     }
 
-    pub fn decrement(&self) -> Self
+    #[inline]
+    pub fn decrement(&self) -> Option<Self>
     {
         match self {
-            Index::Zero => panic!(),
-            Index::One => Index::Zero,
-            Index::Two => Index::One,
-            Index::Three => Index::Two,
-            Index::Four => Index::Three,
-            Index::Five => Index::Four,
-            Index::Six => Index::Five,
-            Index::Seven => Index::Six,
+            Index::Zero => None,
+            Index::One => Some(Index::Zero),
+            Index::Two => Some(Index::One),
+            Index::Three => Some(Index::Two),
+            Index::Four => Some(Index::Three),
+            Index::Five => Some(Index::Four),
+            Index::Six => Some(Index::Five),
+            Index::Seven => Some(Index::Six),
         }
     }
 }
@@ -179,7 +181,7 @@ impl Allocator<Datum> for DatumAllocator
     fn alloc(&self) -> Datum
     {
         let index = self.next.get().unwrap();
-        self.next.set((index < Index::Seven).then(|| index.increment()));
+        self.next.set(index.increment());
         Datum { index, region: Rc::clone(&self.region) }
     }
 }

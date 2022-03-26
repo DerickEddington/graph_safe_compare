@@ -25,23 +25,15 @@ impl<'l> Node for My<'l>
         RefId(self.0)
     }
 
-    fn amount_edges(&self) -> Self::Index
-    {
-        match self.0.0.get() {
-            Inner::Leaf => 0,
-            Inner::Pair(_, _) => 2,
-        }
-    }
-
     fn get_edge(
         &self,
         idx: &Self::Index,
-    ) -> Self
+    ) -> Option<Self>
     {
         match (idx, self.0.0.get()) {
-            (0, Inner::Pair(a, _)) => My(a),
-            (1, Inner::Pair(_, b)) => My(b),
-            _ => panic!("invalid"),
+            (0, Inner::Pair(a, _)) => Some(My(a)),
+            (1, Inner::Pair(_, b)) => Some(My(b)),
+            _ => None,
         }
     }
 

@@ -33,7 +33,6 @@ use {
             DatumAllocator,
             Index::{
                 One,
-                Two,
                 Zero,
             },
             Inner,
@@ -49,37 +48,30 @@ struct Index(tests_utils::node_types::diff_index::Index);
 cfg_if! {
     if #[cfg(feature = "anticipate")]
     {
-        impl Index
-        {
-            const MAX: Self = Self(tests_utils::node_types::diff_index::Index::MAX);
-            const MIN: Self = Self(tests_utils::node_types::diff_index::Index::MIN);
-        }
-
         impl core::iter::Step for Index
         {
             fn steps_between(start: &Self, end: &Self) -> Option<usize> {
                 let mut between = 0;
                 let mut cur = start.0;
-                while cur < end.0 { between += 1; cur = cur.increment(); }
+                while cur < end.0 {
+                    between += 1;
+                    cur = cur.increment().expect("inconsistent with Ord");
+                }
                 (start <= end).then(|| between)
             }
             fn forward_checked(start: Self, count: usize) -> Option<Self> {
-                Self::steps_between(&start, &Self::MAX)
-                    .map_or(false, |between| count <= between)
-                    .then(|| Self((0 .. count).fold(start.0, |index, _| index.increment())))
+                (0 .. count).try_fold(start.0, |index, _| index.increment()).map(Self)
             }
             fn backward_checked(start: Self, count: usize) -> Option<Self> {
-                Self::steps_between(&Self::MIN, &start)
-                    .map_or(false, |between| count <= between)
-                    .then(|| Self((0 .. count).fold(start.0, |index, _| index.decrement())))
+                (0 .. count).try_fold(start.0, |index, _| index.decrement()).map(Self)
             }
         }
     }
     else {
         impl graph_safe_compare::Step for Index
         {
-            fn increment(&self) -> Self {
-                Self(self.0.increment())
+            fn increment(&self) -> Option<Self> {
+                self.0.increment().map(Self)
             }
         }
     }
@@ -140,23 +132,15 @@ impl Node for My
         (Index(self.0.index), RefId(Rc::clone(&self.0.region)))
     }
 
-    fn amount_edges(&self) -> Self::Index
-    {
-        Index(match *self.0.deref() {
-            Inner::Leaf => Zero,
-            Inner::Pair(_, _) => Two,
-        })
-    }
-
     fn get_edge(
         &self,
         idx: &Self::Index,
-    ) -> Self
+    ) -> Option<Self>
     {
         match (idx.0, &*self.0.deref()) {
-            (Zero, Inner::Pair(a, _)) => My(a.clone()),
-            (One, Inner::Pair(_, b)) => My(b.clone()),
-            _ => panic!("invalid"),
+            (Zero, Inner::Pair(a, _)) => Some(My(a.clone())),
+            (One, Inner::Pair(_, b)) => Some(My(b.clone())),
+            _ => None,
         }
     }
 
