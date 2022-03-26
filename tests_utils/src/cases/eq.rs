@@ -473,7 +473,6 @@ macro_rules! eq_variations_tests
                     type RNG = default::RandomNumberGenerator;
                 }
 
-                #[allow(unstable_name_collisions)]
                 let cmp = precheck_interleave::equiv::<_, Args<_>>(a, b).unwrap();
                 cmp.is_equiv()
             }

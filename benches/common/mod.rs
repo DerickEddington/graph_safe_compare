@@ -38,7 +38,7 @@ pub mod defaults
     pub const SLOW_LIMIT_NEG: i32 = Interleave::<Args>::SLOW_LIMIT_NEG;
 
     // The items defined below are not involved in the benchmarks, and they're only needed to be
-    // able to `impl` the `interleave::Params` and `vecstack::Params` traits.
+    // able to use `Args` to define our constants above .
 
     #[derive(Clone, Default)]
     struct Args<'l>(PhantomData<&'l ()>);

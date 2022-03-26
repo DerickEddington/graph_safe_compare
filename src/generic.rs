@@ -232,7 +232,7 @@ mod recursion
         crate::Node,
     };
 
-    /// Descendent [`Node`]s at the same position in the input graphs.
+    /// [`Node`]s at the same position in the input graphs to compare.
     pub type Counterparts<N> = [N; 2];
     /// `Ok` when there are [`Counterparts`] descendents from ancestors.  `Err` when ancestors do
     /// not have the same amount of edges.

@@ -12,13 +12,13 @@ mod ref_id
     /// Compare and hash references by pointer.
     ///
     /// This should be used as the [`Node::Id`](crate::Node::Id), instead of `*const U`, where
-    /// possible, where `T` is some type of reference to the primary inner type of an `N: Node`
-    /// (and must not be a reference to an `N` itself), because it keeps any lifetimes when `T` is
-    /// a `&` type, which is safer for avoiding logic bugs.  While `*const U` can be safely used
-    /// for some types, where `U` is the primary inner type, it is not guaranteed that some
-    /// refactoring does not invalidate the (imaginary) lifetime of such a pointer.  (This crate
-    /// is `forbid(unsafe_code)` but since such pointers would only be used as identifiers (and
-    /// never dereferenced), such lifetime logic bugs could become hypothetically possible).
+    /// possible, where `T` is some type of reference to the primary inner type `U` of an `N:
+    /// Node` (and must not be a reference to an `N` itself).  This is safer for avoiding logic
+    /// bugs, because it keeps any lifetimes of `T`.  While `*const U` can be safely used for some
+    /// types, it is not guaranteed that some refactoring does not invalidate the (imaginary)
+    /// lifetime of such a pointer.  (This crate is `forbid(unsafe_code)` but since such pointers
+    /// would only be used as identifiers (and never dereferenced), such lifetime logic bugs could
+    /// become hypothetically possible).
     ///
     /// If the `T` type is a "fat" reference, the additional metadata is compared and hashed,
     /// because such values with differing metadata could have different behavior and should be

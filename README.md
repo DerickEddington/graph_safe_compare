@@ -221,7 +221,7 @@ fn main() {
 
 - No `unsafe` code.
 
-- No `panic`s.
+- No panics.
 
 - Very minimal dependencies.
 
