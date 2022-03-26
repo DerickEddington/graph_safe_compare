@@ -289,12 +289,15 @@ mod recursion
 }
 
 
-/// The central parts of the algorithm.
-pub mod equiv
+mod edges_iter
 {
     use {
+        super::recursion::{
+            Counterparts,
+            CounterpartsResult,
+        },
         crate::{
-            Cmp,
+            Cmp as _,
             Node,
             Step,
         },
@@ -305,7 +308,115 @@ pub mod equiv
         },
     };
 
+    /// [`Node::Index`] types must give their "zero" value, for their implementation of
+    /// [`Default`].
+    fn zero<T: Default>() -> T
+    {
+        T::default()
+    }
+
+    /// Get edges lazily, in increasing-index order.
+    ///
+    /// Enables avoiding consuming excessive space for `RecurMode` types like `VecStack`.
+    pub struct EdgesIter<N: Node>(
+        iter::Chain<iter::Once<<Self as Iterator>::Item>, EdgesIterTail<N>>,
+    );
+
+    impl<N: Node> EdgesIter<N>
+    {
+        pub(super) fn new(
+            first_edges: Counterparts<N>,
+            tail_iter: EdgesIterTail<N>,
+        ) -> Self
+        {
+            debug_assert!({
+                let one = increment_index(&zero());
+                tail_iter.next_index == one
+            });
+            Self(iter::once(Ok(first_edges)).chain(tail_iter))
+        }
+    }
+
+    impl<N: Node> Iterator for EdgesIter<N>
+    {
+        type Item = CounterpartsResult<N>;
+
+        #[inline]
+        fn next(&mut self) -> Option<Self::Item>
+        {
+            self.0.next()
+        }
+    }
+
+    pub(super) struct EdgesIterTail<N: Node>
+    {
+        pub(super) counterparts: Counterparts<N>,
+        next_index:              Option<N::Index>,
+    }
+
+    impl<N: Node> EdgesIterTail<N>
+    {
+        /// Prepare to get the edges from `counterparts`.
+        pub(super) fn new(counterparts: Counterparts<N>) -> Self
+        {
+            Self { counterparts, next_index: Some(zero()) }
+        }
+    }
+
+    impl<N: Node> Iterator for EdgesIterTail<N>
+    {
+        type Item = CounterpartsResult<N>;
+
+        fn next(&mut self) -> Option<Self::Item>
+        {
+            if let Some(i) = &self.next_index {
+                let [a, b] = &self.counterparts;
+                match [a.get_edge(i), b.get_edge(i)] {
+                    [Some(ae), Some(be)] => {
+                        self.next_index = increment_index(i);
+                        Some(Ok([ae, be]))
+                    },
+                    [None, None] => {
+                        self.next_index = None;
+                        None
+                    },
+                    [None, Some(_)] => Some(Err(N::Cmp::from_ord(Ordering::Less))),
+                    [Some(_), None] => Some(Err(N::Cmp::from_ord(Ordering::Greater))),
+                }
+            }
+            else {
+                None
+            }
+        }
+    }
+
+    fn increment_index<T: Step>(i: &T) -> Option<T>
+    {
+        cfg_if! {
+            if #[cfg(feature = "anticipate")] {
+                Step::forward_checked(i.clone(), 1)
+            }
+            else {
+                i.increment()
+            }
+        }
+    }
+}
+
+
+/// The central parts of the algorithm.
+pub mod equiv
+{
+    use {
+        super::edges_iter::EdgesIterTail,
+        crate::{
+            Cmp,
+            Node,
+        },
+    };
+
     pub use super::{
+        edges_iter::EdgesIter,
         modes::DescendMode,
         recursion::{
             Counterparts,
@@ -489,100 +600,6 @@ pub mod equiv
             }
 
             Ok(cmp)
-        }
-    }
-
-    /// [`Node::Index`] types must give their "zero" value, for their implementation of
-    /// [`Default`].
-    fn zero<T: Default>() -> T
-    {
-        T::default()
-    }
-
-    /// Get edges lazily, in increasing-index order.
-    ///
-    /// Enables avoiding consuming excessive space for `RecurMode` types like `VecStack`.
-    pub struct EdgesIter<N: Node>(
-        iter::Chain<iter::Once<<Self as Iterator>::Item>, EdgesIterTail<N>>,
-    );
-
-    impl<N: Node> EdgesIter<N>
-    {
-        fn new(
-            first_edges: Counterparts<N>,
-            tail_iter: EdgesIterTail<N>,
-        ) -> Self
-        {
-            debug_assert!({
-                let one = increment_index(&zero());
-                tail_iter.next_index == one
-            });
-            Self(iter::once(Ok(first_edges)).chain(tail_iter))
-        }
-    }
-
-    impl<N: Node> Iterator for EdgesIter<N>
-    {
-        type Item = CounterpartsResult<N>;
-
-        #[inline]
-        fn next(&mut self) -> Option<Self::Item>
-        {
-            self.0.next()
-        }
-    }
-
-    struct EdgesIterTail<N: Node>
-    {
-        counterparts: Counterparts<N>,
-        next_index:   Option<N::Index>,
-    }
-
-    impl<N: Node> EdgesIterTail<N>
-    {
-        /// Prepare to get the edges from `counterparts`.
-        fn new(counterparts: Counterparts<N>) -> Self
-        {
-            Self { counterparts, next_index: Some(zero()) }
-        }
-    }
-
-    impl<N: Node> Iterator for EdgesIterTail<N>
-    {
-        type Item = CounterpartsResult<N>;
-
-        fn next(&mut self) -> Option<Self::Item>
-        {
-            if let Some(i) = &self.next_index {
-                let [a, b] = &self.counterparts;
-                match [a.get_edge(i), b.get_edge(i)] {
-                    [Some(ae), Some(be)] => {
-                        self.next_index = increment_index(i);
-                        Some(Ok([ae, be]))
-                    },
-                    [None, None] => {
-                        self.next_index = None;
-                        None
-                    },
-                    [None, Some(_)] => Some(Err(N::Cmp::from_ord(Ordering::Less))),
-                    [Some(_), None] => Some(Err(N::Cmp::from_ord(Ordering::Greater))),
-                }
-            }
-            else {
-                None
-            }
-        }
-    }
-
-    fn increment_index<T: Step>(i: &T) -> Option<T>
-    {
-        cfg_if! {
-            if #[cfg(feature = "anticipate")] {
-                Step::forward_checked(i.clone(), 1)
-            }
-            else {
-                i.increment()
-            }
         }
     }
 }
