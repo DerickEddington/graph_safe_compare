@@ -304,7 +304,7 @@ macro_rules! eq_variations_tests
         {
             use super::*;
 
-            mod vecqueue
+            mod recursion_queue
             {
                 $crate::eq_variation_mod_body!(
                     graph_safe_compare::deep_safe::equiv,
@@ -342,7 +342,7 @@ macro_rules! eq_variations_tests
         {
             use super::*;
 
-            mod vecstack
+            mod recursion_stack
             {
                 $crate::eq_variation_mod_body!(
                     graph_safe_compare::wide_safe::equiv,
@@ -380,7 +380,7 @@ macro_rules! eq_variations_tests
         {
             use super::*;
 
-            mod interleave_vecqueue
+            mod interleave_recurqueue
             {
                 $crate::eq_variation_mod_body!(
                     graph_safe_compare::robust::equiv,
@@ -390,7 +390,7 @@ macro_rules! eq_variations_tests
                                          #[cfg(all())], #[cfg(all())]);
             }
 
-            mod precheck_interleave_vecqueue
+            mod precheck_interleave_recurqueue
             {
                 $crate::eq_variation_mod_body!(
                     graph_safe_compare::robust::precheck_equiv,
@@ -421,9 +421,9 @@ macro_rules! eq_variations_tests
                             self,
                             random::default,
                         },
-                        deep_safe::recursion::vecqueue::{
+                        deep_safe::recursion::{
                             self,
-                            VecQueue,
+                            queue::RecurQueue,
                         },
                         generic::{
                             precheck_interleave,
@@ -443,11 +443,11 @@ macro_rules! eq_variations_tests
                 {
                     type Error = Infallible;
                     type PrecheckRecurMode = CallStack;
-                    type InterleaveRecurMode = VecQueue<Self>;
+                    type InterleaveRecurMode = RecurQueue<Self>;
                     type InterleaveParams = Self;
                 }
 
-                impl<N: Node> vecqueue::Params for Args<N>
+                impl<N: Node> recursion::queue::Params for Args<N>
                 {
                     // Use custom value for this constant, not its default.
                     const INITIAL_CAPACITY: usize = 1 << 10;
@@ -477,7 +477,7 @@ macro_rules! eq_variations_tests
                 cmp.is_equiv()
             }
 
-            mod precheck_interleave_callstack_vecqueue
+            mod precheck_interleave_callstack_recurqueue
             {
                 $crate::eq_variation_mod_body!(
                     super::precheck_interleave_equiv,

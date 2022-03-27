@@ -317,7 +317,8 @@ mod edges_iter
 
     /// Get edges lazily, in increasing-index order.
     ///
-    /// Enables avoiding consuming excessive space for `RecurMode` types like `VecStack`.
+    /// Enables avoiding consuming excessive space for `RecurMode` types like `RecurStack` and
+    /// `RecurQueue`.
     pub struct EdgesIter<N: Node>(
         iter::Chain<iter::Once<<Self as Iterator>::Item>, EdgesIterTail<N>>,
     );

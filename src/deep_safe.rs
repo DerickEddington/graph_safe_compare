@@ -3,9 +3,9 @@ pub use premade::*;
 mod premade
 {
     use {
-        super::recursion::vecqueue::{
+        super::recursion::{
             self,
-            VecQueue,
+            queue::RecurQueue,
         },
         crate::{
             anticipated_or_like::Infallible,
@@ -43,10 +43,10 @@ mod premade
             type DescendMode = Unlimited;
             type Error = Infallible;
             type Node = N;
-            type RecurMode = VecQueue<Self>;
+            type RecurMode = RecurQueue<Self>;
         }
 
-        impl<N: Node> vecqueue::Params for Args<N>
+        impl<N: Node> recursion::queue::Params for Args<N>
         {
             type Node = N;
         }
@@ -76,10 +76,10 @@ mod premade
             type DescendMode = Limited<L>;
             type Error = LimitReached;
             type Node = N;
-            type RecurMode = VecQueue<Self>;
+            type RecurMode = RecurQueue<Self>;
         }
 
-        impl<N: Node, L: Ticker> vecqueue::Params for Args<N, L>
+        impl<N: Node, L: Ticker> recursion::queue::Params for Args<N, L>
         {
             type Node = N;
         }
@@ -93,7 +93,7 @@ mod premade
 /// Extend the algorithm to be able to traverse very-deep graphs.
 pub mod recursion
 {
-    pub mod vecqueue
+    pub mod queue
     {
         //! Use [`VecDeque`] for the recursion continuations, instead of the call-stack.
         //!
@@ -118,10 +118,11 @@ pub mod recursion
             alloc::collections::VecDeque,
         };
 
-        /// Generic parameters of [`VecQueue`] and its operations.
+        /// Generic parameters of [`RecurQueue`] and its operations.
         pub trait Params
         {
-            /// Amount of elements that a [`VecQueue`] can contain initially before reallocating.
+            /// Amount of elements that a [`RecurQueue`] can contain initially before
+            /// reallocating.
             ///
             /// An `impl` of [`Params`] may be made with a different value - either smaller or
             /// larger.  Note that the default only affects the initial capacity of the underlying
@@ -143,9 +144,10 @@ pub mod recursion
         /// (If, instead, you want to limit how much a recursion-queue can grow, you must `impl`
         /// [`RecurMode`] for your own type that does that and use it with the
         /// [`generic`](crate::generic) API.)
-        pub struct VecQueue<P: Params>(VecDeque<EdgesIter<P::Node>>);
+        #[allow(clippy::module_name_repetitions)]
+        pub struct RecurQueue<P: Params>(VecDeque<EdgesIter<P::Node>>);
 
-        impl<P: Params> Default for VecQueue<P>
+        impl<P: Params> Default for RecurQueue<P>
         {
             /// Create a new instance with capacity
             /// [`P::INITIAL_CAPACITY`](Params::INITIAL_CAPACITY).
@@ -158,7 +160,7 @@ pub mod recursion
 
         /// Enables the call-stack to be used for the precheck and the vector-queue for the
         /// interleave, if desired.
-        impl<P: Params> From<CallStack> for VecQueue<P>
+        impl<P: Params> From<CallStack> for RecurQueue<P>
         {
             #[inline]
             fn from(_: CallStack) -> Self
@@ -167,8 +169,8 @@ pub mod recursion
             }
         }
 
-        /// Enables [`VecQueue`] to be used with the algorithm.
-        impl<E, V> RecurMode<E> for VecQueue<V>
+        /// Enables [`RecurQueue`] to be used with the algorithm.
+        impl<E, V> RecurMode<E> for RecurQueue<V>
         where
             E: equiv::Params<RecurMode = Self>,
             V: Params<Node = E::Node>,
@@ -200,8 +202,8 @@ pub mod recursion
                 None
             }
 
-            /// An aborted precheck, that uses `VecQueue`, might have left some elements, so we
-            /// must reset before doing the interleave using the same `VecQueue`.
+            /// An aborted precheck, that uses `RecurQueue`, might have left some elements, so we
+            /// must reset before doing the interleave using the same `RecurQueue`.
             #[inline]
             fn reset(mut self) -> Self
             {

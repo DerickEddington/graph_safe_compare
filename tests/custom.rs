@@ -96,7 +96,7 @@ mod custom_table
 
 
 /// Use `LinkedList` just because it's different than
-/// `graph_safe_compare::wide_safe::recursion::vecstack::VecStack`.
+/// `graph_safe_compare::wide_safe::recursion::stack::RecurStack`.
 ///
 /// Also, enables this integration test to be used when the `graph_safe_compare` crate is
 /// built without the "std" feature enabled, and enables running the test cases of very-deep

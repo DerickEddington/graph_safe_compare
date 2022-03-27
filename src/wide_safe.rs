@@ -3,9 +3,9 @@ pub use premade::*;
 mod premade
 {
     use {
-        super::recursion::vecstack::{
+        super::recursion::{
             self,
-            VecStack,
+            stack::RecurStack,
         },
         crate::{
             anticipated_or_like::Infallible,
@@ -43,10 +43,10 @@ mod premade
             type DescendMode = Unlimited;
             type Error = Infallible;
             type Node = N;
-            type RecurMode = VecStack<Self>;
+            type RecurMode = RecurStack<Self>;
         }
 
-        impl<N: Node> vecstack::Params for Args<N>
+        impl<N: Node> recursion::stack::Params for Args<N>
         {
             type Node = N;
         }
@@ -76,10 +76,10 @@ mod premade
             type DescendMode = Limited<L>;
             type Error = LimitReached;
             type Node = N;
-            type RecurMode = VecStack<Self>;
+            type RecurMode = RecurStack<Self>;
         }
 
-        impl<N: Node, L: Ticker> vecstack::Params for Args<N, L>
+        impl<N: Node, L: Ticker> recursion::stack::Params for Args<N, L>
         {
             type Node = N;
         }
@@ -93,7 +93,7 @@ mod premade
 /// Extend the algorithm to be able to traverse very-wide graphs.
 pub mod recursion
 {
-    pub mod vecstack
+    pub mod stack
     {
         //! Use [`Vec`] for the recursion stack, instead of the call-stack.
         //!
@@ -118,10 +118,11 @@ pub mod recursion
             alloc::vec::Vec,
         };
 
-        /// Generic parameters of [`VecStack`] and its operations.
+        /// Generic parameters of [`RecurStack`] and its operations.
         pub trait Params
         {
-            /// Amount of elements that a [`VecStack`] can contain initially before reallocating.
+            /// Amount of elements that a [`RecurStack`] can contain initially before
+            /// reallocating.
             ///
             /// An `impl` of [`Params`] may be made with a different value - either smaller or
             /// larger.  Note that the default only affects the initial capacity of the underlying
@@ -154,9 +155,10 @@ pub mod recursion
         /// (If, instead, you want to limit how much a recursion-stack can grow, you must `impl`
         /// [`RecurMode`] for your own type that does that and use it with the
         /// [`generic`](crate::generic) API.)
-        pub struct VecStack<P: Params>(Vec<EdgesIter<P::Node>>);
+        #[allow(clippy::module_name_repetitions)]
+        pub struct RecurStack<P: Params>(Vec<EdgesIter<P::Node>>);
 
-        impl<P: Params> Default for VecStack<P>
+        impl<P: Params> Default for RecurStack<P>
         {
             /// Create a new instance with capacity
             /// [`P::INITIAL_CAPACITY`](Params::INITIAL_CAPACITY).
@@ -169,7 +171,7 @@ pub mod recursion
 
         /// Enables the call-stack to be used for the precheck and the vector-stack for the
         /// interleave, if desired.
-        impl<P: Params> From<CallStack> for VecStack<P>
+        impl<P: Params> From<CallStack> for RecurStack<P>
         {
             #[inline]
             fn from(_: CallStack) -> Self
@@ -178,8 +180,8 @@ pub mod recursion
             }
         }
 
-        /// Enables [`VecStack`] to be used with the algorithm.
-        impl<E, V> RecurMode<E> for VecStack<V>
+        /// Enables [`RecurStack`] to be used with the algorithm.
+        impl<E, V> RecurMode<E> for RecurStack<V>
         where
             E: equiv::Params<RecurMode = Self>,
             V: Params<Node = E::Node>,
@@ -211,8 +213,8 @@ pub mod recursion
                 None
             }
 
-            /// An aborted precheck, that uses `VecStack`, might have left some elements, so we
-            /// must reset before doing the interleave using the same `VecStack`.
+            /// An aborted precheck, that uses `RecurStack`, might have left some elements, so we
+            /// must reset before doing the interleave using the same `RecurStack`.
             #[inline]
             fn reset(mut self) -> Self
             {
