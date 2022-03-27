@@ -112,6 +112,10 @@ pub mod recursion
                     Equiv,
                     RecurMode,
                 },
+                utils::{
+                    LazierIterator as _,
+                    LazyVecStack,
+                },
                 Cmp,
                 Node,
             },
@@ -156,7 +160,7 @@ pub mod recursion
         /// [`RecurMode`] for your own type that does that and use it with the
         /// [`generic`](crate::generic) API.)
         #[allow(clippy::module_name_repetitions)]
-        pub struct RecurStack<P: Params>(Vec<EdgesIter<P::Node>>);
+        pub struct RecurStack<P: Params>(LazyVecStack<EdgesIter<P::Node>>);
 
         impl<P: Params> Default for RecurStack<P>
         {
@@ -165,7 +169,7 @@ pub mod recursion
             #[inline]
             fn default() -> Self
             {
-                Self(Vec::with_capacity(P::INITIAL_CAPACITY))
+                Self(LazyVecStack(Vec::with_capacity(P::INITIAL_CAPACITY)))
             }
         }
 
@@ -195,22 +199,14 @@ pub mod recursion
                 edges_iter: EdgesIter<E::Node>,
             ) -> Result<<E::Node as Node>::Cmp, Self::Error>
             {
-                it.recur_mode.0.push(edges_iter);
+                it.recur_mode.0.extend(edges_iter);
                 Ok(Cmp::new_equiv())
             }
 
             #[inline]
             fn next(&mut self) -> Option<CounterpartsResult<E::Node>>
             {
-                while let Some(edges_iter) = self.0.last_mut() {
-                    let next = edges_iter.next();
-                    if next.is_some() {
-                        return next;
-                    }
-                    // Remove empty iterators from the stack.
-                    drop(self.0.pop());
-                }
-                None
+                self.0.next()
             }
 
             /// An aborted precheck, that uses `RecurStack`, might have left some elements, so we
@@ -218,7 +214,7 @@ pub mod recursion
             #[inline]
             fn reset(mut self) -> Self
             {
-                self.0.clear();
+                self.0.0.clear();
                 self
             }
         }

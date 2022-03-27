@@ -1,4 +1,11 @@
+#[cfg(feature = "alloc")]
+pub(crate) use lazy_collections::{
+    LazierIterator,
+    LazyVecQueue,
+    LazyVecStack,
+};
 pub use ref_id::RefId;
+
 
 mod ref_id
 {
@@ -123,5 +130,88 @@ mod ref_id
         {
             Ord::cmp(&self.as_ptr(), &other.as_ptr())
         }
+    }
+}
+
+
+#[cfg(feature = "alloc")]
+mod lazy_collections
+{
+    extern crate alloc;
+    use alloc::{
+        collections::VecDeque,
+        vec::Vec,
+    };
+
+    /// A logical stack of items yielded by an internal stack of [`Iterator`]s.  Enables lazily
+    /// generating items to reduce memory usage.
+    pub(crate) struct LazyVecStack<I>(pub(crate) Vec<I>);
+
+    /// A logical queue of items yielded by an internal queue of [`Iterator`]s.  Enables lazily
+    /// generating items to reduce memory usage.
+    pub(crate) struct LazyVecQueue<I>(pub(crate) VecDeque<I>);
+
+    /// Somewhat similar to [`Flatten`](core::iter::Flatten) but designed to not consume ownership
+    /// and not hold a "current" sub-iterator so that mutating to `extend` with further items may
+    /// be done between `next` calls.
+    pub(crate) trait LazierIterator
+    {
+        type SubIter: Iterator;
+
+        fn extend(
+            &mut self,
+            subiter: Self::SubIter,
+        );
+
+        fn next_subiter_as_mut(&mut self) -> Option<&mut Self::SubIter>;
+
+        fn next_subiter(&mut self) -> Option<Self::SubIter>;
+
+        #[allow(clippy::inline_always)]
+        #[inline(always)] // Actually makes a big difference.
+        fn next(&mut self) -> Option<<Self::SubIter as Iterator>::Item>
+        {
+            while let Some(subiter) = self.next_subiter_as_mut() {
+                if let next @ Some(_) = subiter.next() {
+                    return next;
+                }
+                drop(self.next_subiter()); // Remove empty iterators.
+            }
+            None
+        }
+    }
+
+    macro_rules! provided_impls {
+        { $($t:ty { $extend:ident, $next_subiter_as_mut:ident, $next_subiter:ident },)* } => {
+            $(
+                impl<I: Iterator> LazierIterator for $t
+                {
+                    type SubIter = I;
+
+                    fn extend(
+                        &mut self,
+                        subiter: Self::SubIter,
+                    )
+                    {
+                        self.0.$extend(subiter);
+                    }
+
+                    fn next_subiter_as_mut(&mut self) -> Option<&mut Self::SubIter>
+                    {
+                        self.0.$next_subiter_as_mut()
+                    }
+
+                    fn next_subiter(&mut self) -> Option<Self::SubIter>
+                    {
+                        self.0.$next_subiter()
+                    }
+                }
+            )*
+        };
+    }
+
+    provided_impls! {
+        LazyVecStack<I> { push, last_mut, pop },
+        LazyVecQueue<I> { push_back, front_mut, pop_front },
     }
 }
