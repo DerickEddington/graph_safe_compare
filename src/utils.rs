@@ -148,11 +148,11 @@ mod lazy_collections
 
     /// A logical stack of items yielded by an internal stack of [`Iterator`]s.  Enables lazily
     /// generating items to reduce memory usage.
-    pub(crate) struct LazyVecStack<I: Iterator>(pub(crate) Vec<Peekable<I>>);
+    pub(crate) struct LazyVecStack<I: Iterator>(Vec<Peekable<I>>);
 
     /// A logical queue of items yielded by an internal queue of [`Iterator`]s.  Enables lazily
     /// generating items to reduce memory usage.
-    pub(crate) struct LazyVecQueue<I: Iterator>(pub(crate) VecDeque<Peekable<I>>);
+    pub(crate) struct LazyVecQueue<I: Iterator>(VecDeque<Peekable<I>>);
 
     /// Somewhat similar to [`Flatten`](core::iter::Flatten) but designed to not consume ownership
     /// and not hold a "current" sub-iterator so that mutating to `extend` with further items may
@@ -188,8 +188,28 @@ mod lazy_collections
     }
 
     macro_rules! provided_impls {
-        { $($t:ty { $extend:ident, $next_subiter_as_mut:ident, $next_subiter:ident },)* } => {
+        {
+            $($t:ty {
+                $with_capacity:path,
+                $extend:ident,
+                $next_subiter_as_mut:ident,
+                $next_subiter:ident
+            },)*
+        } => {
             $(
+                impl<I: Iterator> $t
+                {
+                    pub(crate) fn with_capacity(capacity: usize) -> Self
+                    {
+                        Self($with_capacity(capacity))
+                    }
+
+                    pub(crate) fn clear(&mut self)
+                    {
+                        self.0.clear()
+                    }
+                }
+
                 impl<I: Iterator> LazierIterator for $t
                 {
                     type SubIter = I;
@@ -217,7 +237,7 @@ mod lazy_collections
     }
 
     provided_impls! {
-        LazyVecStack<I> { push, last_mut, pop },
-        LazyVecQueue<I> { push_back, front_mut, pop_front },
+        LazyVecStack<I> { Vec::with_capacity, push, last_mut, pop },
+        LazyVecQueue<I> { VecDeque::with_capacity, push_back, front_mut, pop_front },
     }
 }

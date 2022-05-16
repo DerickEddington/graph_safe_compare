@@ -99,27 +99,22 @@ pub mod recursion
         //!
         //! The performance is competitive with, and sometimes better than, the call-stack.
 
-        extern crate alloc;
-
-        use {
-            crate::{
-                anticipated_or_like::Infallible,
-                basic::recursion::callstack::CallStack,
-                generic::equiv::{
-                    self,
-                    CounterpartsResult,
-                    EdgesIter,
-                    Equiv,
-                    RecurMode,
-                },
-                utils::{
-                    LazierIterator as _,
-                    LazyVecStack,
-                },
-                Cmp,
-                Node,
+        use crate::{
+            anticipated_or_like::Infallible,
+            basic::recursion::callstack::CallStack,
+            generic::equiv::{
+                self,
+                CounterpartsResult,
+                EdgesIter,
+                Equiv,
+                RecurMode,
             },
-            alloc::vec::Vec,
+            utils::{
+                LazierIterator as _,
+                LazyVecStack,
+            },
+            Cmp,
+            Node,
         };
 
         /// Generic parameters of [`RecurStack`] and its operations.
@@ -169,7 +164,7 @@ pub mod recursion
             #[inline]
             fn default() -> Self
             {
-                Self(LazyVecStack(Vec::with_capacity(P::INITIAL_CAPACITY)))
+                Self(LazyVecStack::with_capacity(P::INITIAL_CAPACITY))
             }
         }
 
@@ -214,7 +209,7 @@ pub mod recursion
             #[inline]
             fn reset(mut self) -> Self
             {
-                self.0.0.clear();
+                self.0.clear();
                 self
             }
         }
