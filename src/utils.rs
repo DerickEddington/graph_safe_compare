@@ -138,18 +138,21 @@ mod ref_id
 mod lazy_collections
 {
     extern crate alloc;
-    use alloc::{
-        collections::VecDeque,
-        vec::Vec,
+    use {
+        alloc::{
+            collections::VecDeque,
+            vec::Vec,
+        },
+        core::iter::Peekable,
     };
 
     /// A logical stack of items yielded by an internal stack of [`Iterator`]s.  Enables lazily
     /// generating items to reduce memory usage.
-    pub(crate) struct LazyVecStack<I>(pub(crate) Vec<I>);
+    pub(crate) struct LazyVecStack<I: Iterator>(pub(crate) Vec<Peekable<I>>);
 
     /// A logical queue of items yielded by an internal queue of [`Iterator`]s.  Enables lazily
     /// generating items to reduce memory usage.
-    pub(crate) struct LazyVecQueue<I>(pub(crate) VecDeque<I>);
+    pub(crate) struct LazyVecQueue<I: Iterator>(pub(crate) VecDeque<Peekable<I>>);
 
     /// Somewhat similar to [`Flatten`](core::iter::Flatten) but designed to not consume ownership
     /// and not hold a "current" sub-iterator so that mutating to `extend` with further items may
@@ -163,19 +166,22 @@ mod lazy_collections
             subiter: Self::SubIter,
         );
 
-        fn next_subiter_as_mut(&mut self) -> Option<&mut Self::SubIter>;
+        fn next_subiter_as_mut(&mut self) -> Option<&mut Peekable<Self::SubIter>>;
 
-        fn next_subiter(&mut self) -> Option<Self::SubIter>;
+        fn next_subiter(&mut self) -> Option<Peekable<Self::SubIter>>;
 
         #[allow(clippy::inline_always)]
         #[inline(always)] // Actually makes a big difference.
         fn next(&mut self) -> Option<<Self::SubIter as Iterator>::Item>
         {
             while let Some(subiter) = self.next_subiter_as_mut() {
-                if let next @ Some(_) = subiter.next() {
+                let next = subiter.next();
+                if subiter.peek().is_none() {
+                    drop(self.next_subiter()); // Remove empty iterators, before returning `Some`.
+                }
+                if next.is_some() {
                     return next;
                 }
-                drop(self.next_subiter()); // Remove empty iterators.
             }
             None
         }
@@ -193,15 +199,15 @@ mod lazy_collections
                         subiter: Self::SubIter,
                     )
                     {
-                        self.0.$extend(subiter);
+                        self.0.$extend(subiter.peekable());
                     }
 
-                    fn next_subiter_as_mut(&mut self) -> Option<&mut Self::SubIter>
+                    fn next_subiter_as_mut(&mut self) -> Option<&mut Peekable<Self::SubIter>>
                     {
                         self.0.$next_subiter_as_mut()
                     }
 
-                    fn next_subiter(&mut self) -> Option<Self::SubIter>
+                    fn next_subiter(&mut self) -> Option<Peekable<Self::SubIter>>
                     {
                         self.0.$next_subiter()
                     }

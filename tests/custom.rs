@@ -159,7 +159,8 @@ mod custom_recur_stack
                 if next.is_some() {
                     return next;
                 }
-                // Remove empty iterators from the stack.
+                // Remove empty iterators from the stack, after returning `Some` - just to be
+                // different and to have inefficient memory usage without "tail-call elimination".
                 drop(self.0.pop_front());
             }
             None
