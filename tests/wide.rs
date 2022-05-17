@@ -56,8 +56,9 @@ impl<'l> Node for My<'l>
 
 fn new(depth: u32) -> Datum
 {
-    let width = f64::from(great_width()).powf(1.0 / f64::from(depth)).round() as usize;
-    Datum::degenerate_chain(width, depth)
+    let total_width = great_width() as f64;
+    let per_level_width = total_width.powf(1.0 / f64::from(depth)).round() as usize;
+    Datum::degenerate_chain(per_level_width, depth)
 }
 
 fn new_couple(depth: u32) -> (Datum, Datum)
@@ -139,6 +140,7 @@ variation_tests!(robust);
 variation_tests!(cycle_safe);
 #[cfg(feature = "alloc")]
 variation_tests!(wide_safe);
+variation_tests!(deep_safe);
 variation_tests!(basic);
 
 mod derived_eq

@@ -60,9 +60,9 @@ pub mod sizes
         get_env_var("MY_TEST_DEGENERATE_DEPTH", DEFAULT)
     }
 
-    pub fn great_width() -> u32
+    pub fn great_width() -> u64
     {
-        const DEFAULT: u32 = if cfg!(debug_assertions) { 100_000_000 } else { 1_000_000_000 };
+        const DEFAULT: u64 = if cfg!(debug_assertions) { 100_000_000 } else { 1_000_000_000 };
 
         get_env_var("MY_TEST_GREAT_WIDTH", DEFAULT)
     }
