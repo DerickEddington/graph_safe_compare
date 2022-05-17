@@ -35,14 +35,19 @@ macro_rules! eq_case {
         let make2 = $crate::shapes::PairChainMaker::new_with($shape_size, alloc2);
         let (head2, tail2) = $shape_trans(make2.$shape_method());
 
-        // TODO: With assert_eq!, failures try to format the values, but there are some huge
-        // values for which this tries to consume all memory just to format. Need the Debug impls
-        // to limit how big of a formatted string they generate or something.
+        let is_eq = {
+            let a = $datum_trans(Clone::clone(&head1));
+            let b = $datum_trans(Clone::clone(&head2));
+            a == b
+        }; // Drop clones here.
 
-        // The main purpose of this macro: test the `PartialEq` implementation:
-        assert!($datum_trans(Clone::clone(&head1)) == $datum_trans(Clone::clone(&head2)));
-
+        // Now, drop these our special way (that avoids stack overflow) before the following
+        // assert! could cause panic unwinding that would drop them the normal way (that could
+        // cause stack overflow).
         $crate::shapes::cycle_deep_safe_drop([(head1, tail1), (head2, tail2)]);
+
+        // The main purpose of this macro: test the `PartialEq` implementation.
+        assert!(is_eq);
     };
 }
 
