@@ -95,7 +95,7 @@ pub mod recursion
 {
     pub mod stack
     {
-        //! Use [`Vec`] for the recursion stack, instead of the call-stack.
+        //! Use `LazyVecStack` for the recursion stack, instead of the call-stack.
         //!
         //! The performance is competitive with, and sometimes better than, the call-stack.
 
@@ -125,7 +125,7 @@ pub mod recursion
             ///
             /// An `impl` of [`Params`] may be made with a different value - either smaller or
             /// larger.  Note that the default only affects the initial capacity of the underlying
-            /// [`Vec`], and it will still grow as large as needed regardless by reallocating.
+            /// `Vec`, and it will still grow as large as needed regardless by reallocating.
             ///
             /// The maximum amount of elements depends on the order in which edges are given by
             /// the [`Node::get_edge`] implementation for an input type.  (See also the
@@ -136,8 +136,8 @@ pub mod recursion
             type Node: Node;
         }
 
-        /// Stack of pairs of nodes that must next be compared pairwise.  The size is limited only
-        /// by available memory.  Specifies use of this.
+        /// Stack of lazily-generated pairs of nodes that must next be compared pairwise.  The
+        /// size is limited only by available memory.  Specifies use of this.
         ///
         /// Does depth-first preorder traversals.  Typically used when it is likely that the input
         /// graphs will be wider than they are deep.  Great width can be handled with very little

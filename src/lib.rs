@@ -102,8 +102,8 @@ pub mod wide_safe;
 pub mod basic;
 
 /// Items that require choosing specific instantiations, which allows customizability beyond the
-/// premade functions of the other modules.  Can be used to achieve cycle-safety and/or
-/// deep-safety.
+/// premade functions of the other modules.  Can be used to achieve custom safety properties in
+/// addition to safety for various graph shapes.
 pub mod generic;
 
 /// Miscellaneous utilities that are sometimes useful.

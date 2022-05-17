@@ -95,7 +95,7 @@ pub mod recursion
 {
     pub mod queue
     {
-        //! Use [`VecDeque`] for the recursion continuations, instead of the call-stack.
+        //! Use `LazyVecQueue` for the recursion continuations, instead of the call-stack.
         //!
         //! The performance is competitive with, and sometimes better than, the call-stack.
 
@@ -125,16 +125,15 @@ pub mod recursion
             ///
             /// An `impl` of [`Params`] may be made with a different value - either smaller or
             /// larger.  Note that the default only affects the initial capacity of the underlying
-            /// [`VecDeque`], and it will still grow as large as needed regardless by
-            /// reallocating.
+            /// `VecDeque`, and it will still grow as large as needed regardless by reallocating.
             const INITIAL_CAPACITY: usize = 2_usize.pow(4);
             /// Type of node that is saved in a queue.  Must be the same as used with the
             /// corresponding [`equiv::Params`].
             type Node: Node;
         }
 
-        /// Queue of pairs of nodes that must next be compared pairwise.  The size is limited only
-        /// by available memory.  Specifies use of this.
+        /// Queue of lazily-generated pairs of nodes that must next be compared pairwise.  The
+        /// size is limited only by available memory.  Specifies use of this.
         ///
         /// Does breadth-first traversals.  Typically used when it is likely that the input graphs
         /// will be deeper than they are wide.  Great depth can be handled with very little memory
