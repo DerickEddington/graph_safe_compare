@@ -237,6 +237,7 @@ impl Pair for Kind
     }
 }
 
+#[derive(Clone)]
 pub struct KindAllocator;
 
 impl KindAllocator

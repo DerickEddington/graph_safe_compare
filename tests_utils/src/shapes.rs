@@ -48,6 +48,16 @@ pub trait Pair: Leaf
         <Self as Pair>::new_in(a, b, &Self::Alloc::default())
     }
 
+    #[allow(unused_variables)]
+    fn into_vee_tails_for_head(
+        left_tail: Self,
+        right_tail: Self,
+        head: &Self,
+    ) -> (Self, Self)
+    {
+        (left_tail, right_tail)
+    }
+
     fn needs_cycle_deep_safe_drop() -> bool
     {
         true
@@ -91,6 +101,32 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
         self.chain(Self::clone_head, Self::leaf)
     }
 
+    pub fn vee(self) -> (T, (T, T))
+    where A: Clone
+    {
+        if self.depth >= 1 {
+            let alloc = self.alloc.clone();
+            let side_depth = self.depth.saturating_sub(1);
+            let mut left_maker = self;
+            left_maker.depth = side_depth;
+            let (left_head, left_tail) = left_maker.inverted_list();
+            let right_maker = Self::new_with(side_depth, alloc.clone());
+            let (right_head, right_tail) = right_maker.list();
+            let head = Pair::new_in(left_head, right_head, &alloc);
+            if side_depth == 0 {
+                // Help types that lazily generate values, like `node_types::lazy` does.
+                // For other types, this is valid but redundant.
+                let (left_head, right_head) = Pair::take(&head).expect("not pair");
+                Pair::set(&head, left_head, right_head);
+            }
+            let tails = Pair::into_vee_tails_for_head(left_tail, right_tail, &head);
+            (head, tails)
+        }
+        else {
+            (self.head, (self.tail.clone(), self.tail))
+        }
+    }
+
     pub fn degenerate_dag(self) -> (T, T)
     {
         self.degenerate()
@@ -105,7 +141,7 @@ impl<T: Pair<Alloc = A> + Clone, A: Allocator<T>> PairChainMaker<A, T>
             Pair::set(&tail, head.clone(), head.clone());
             // Help types that lazily generate values, like `node_types::lazy` does.
             // For other types, this is valid but redundant.
-            head = Pair::take(&tail).expect("pair").0;
+            head = Pair::take(&tail).expect("not pair").0;
             Pair::set(&tail, head.clone(), head.clone());
         }
         (head, tail)

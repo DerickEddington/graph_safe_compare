@@ -8,13 +8,32 @@ macro_rules! eq_case {
         $shape_method:ident,
         $datum_trans:expr
     ) => {
+        $crate::eq_case!(
+            $alloc_trans,
+            $make_alloc,
+            $alloc_size,
+            $shape_size,
+            $shape_method,
+            $datum_trans,
+            (std::convert::identity)
+        )
+    };
+    (
+        $alloc_trans:tt,
+        $make_alloc:expr,
+        $alloc_size:expr,
+        $shape_size:expr,
+        $shape_method:ident,
+        $datum_trans:expr,
+        $shape_trans:tt
+    ) => {
         let alloc1 = $alloc_trans($make_alloc($alloc_size));
         let make1 = $crate::shapes::PairChainMaker::new_with($shape_size, alloc1);
-        let (head1, tail1) = make1.$shape_method();
+        let (head1, tail1) = $shape_trans(make1.$shape_method());
 
         let alloc2 = $alloc_trans($make_alloc($alloc_size));
         let make2 = $crate::shapes::PairChainMaker::new_with($shape_size, alloc2);
-        let (head2, tail2) = make2.$shape_method();
+        let (head2, tail2) = $shape_trans(make2.$shape_method());
 
         // TODO: With assert_eq!, failures try to format the values, but there are some huge
         // values for which this tries to consume all memory just to format. Need the Debug impls
@@ -141,6 +160,58 @@ macro_rules! eq_shapes_tests
                     $crate::sizes::long_list_length(),
                     inverted_list,
                     $datum_trans
+                );
+            }
+        }
+
+        #[cfg(test)]
+        mod vee
+        {
+            use super::*;
+
+            fn amount_nodes(depth: u32) -> u32
+            {
+                let side_amount = depth.checked_sub(1).map(|d| 2 * d + 1).unwrap_or(0);
+                2 * side_amount + 1
+            }
+
+            fn adapt_double_tails_to_single<T: PartialEq>(
+                (head, (left_tail, right_tail)): (T, (T, T))
+            ) -> (T, T)
+            {
+                (head, left_tail)
+            }
+
+            #[test]
+            fn short()
+            {
+                let depth = 100;
+
+                $crate::eq_case!(
+                    $alloc_trans,
+                    $make_alloc,
+                    amount_nodes(depth),
+                    depth,
+                    vee,
+                    $datum_trans,
+                    adapt_double_tails_to_single
+                );
+            }
+
+            #[test]
+            #[$maybe_ignore_stack_overflow]
+            fn long()
+            {
+                let depth = $crate::sizes::long_list_length();
+
+                $crate::eq_case!(
+                    $alloc_trans,
+                    $make_alloc,
+                    amount_nodes(depth),
+                    depth,
+                    vee,
+                    $datum_trans,
+                    adapt_double_tails_to_single
                 );
             }
         }

@@ -127,16 +127,9 @@ pub mod recursion
             /// larger.  Note that the default only affects the initial capacity of the underlying
             /// [`Vec`], and it will still grow as large as needed regardless by reallocating.
             ///
-            /// The maximum amount of elements depends on the maximum recursion depth (which
-            /// depends on the shape of an input value) and it depends on the order in which edges
-            /// are given by the [`Node::get_edge`] implementation for an input type.  For some
-            /// shapes, like lists, the order can be chosen to have a kind of "tail-call
-            /// elimination" to achieve very few elements max on a stack even for very long
-            /// shapes, by giving the deeper "tail" of a shape last after other shallower edges so
-            /// that the shallower edges are descended first and then the deeper "tail" is
-            /// descended last, which limits the max to only the few elements needed to descend
-            /// shallower edges.  This approach might also be doable for some shapes that have
-            /// multiple "tails".
+            /// The maximum amount of elements depends on the order in which edges are given by
+            /// the [`Node::get_edge`] implementation for an input type.  (See also the
+            /// documentation of [`RecurStack`].)
             const INITIAL_CAPACITY: usize = 2_usize.pow(4);
             /// Type of node that is saved on a stack.  Must be the same as used with the
             /// corresponding [`equiv::Params`].
@@ -148,8 +141,18 @@ pub mod recursion
         ///
         /// Does depth-first preorder traversals.  Typically used when it is likely that the input
         /// graphs will be wider than they are deep.  Great width can be handled with very little
-        /// memory usage, but great depth can cause excessive memory usage (when tail-call
-        /// elimination cannot be achieved).
+        /// memory usage, but great depth can cause excessive memory usage (when "tail-call
+        /// elimination" cannot be achieved).
+        ///
+        /// The memory usage depends on the order in which edges are given by the
+        /// [`Node::get_edge`] implementation for an input type.  For some shapes, e.g. lists, the
+        /// order can be chosen to give the analogue of "tail-call elimination" to achieve limited
+        /// elements maximum on a stack even for very long shapes, by giving the deeper "tail"
+        /// edge of a node after its other shallower edges so that the shallower edges are
+        /// descended before the deeper "tail", which limits the max to only the elements needed
+        /// to descend shallower edges.  This approach might also be doable for some shapes that
+        /// have multiple "tails", by giving edges in different orders based on the different
+        /// position of each node in a shape.
         ///
         /// (If, instead, you want to limit how much a recursion-stack can grow, you must `impl`
         /// [`RecurMode`] for your own type that does that and use it with the

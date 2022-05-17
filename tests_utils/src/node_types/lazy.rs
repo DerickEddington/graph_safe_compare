@@ -23,6 +23,7 @@ pub enum Shape
     Leaf,
     List,
     InvertedList,
+    Vee,
     DegenerateDAG,
     DegenerateCyclic,
 }
@@ -78,6 +79,9 @@ impl Inner
                     };
                 },
                 InvertedList => {
+                    let amount_nodes = 2 * self.depth + 1;
+                    debug_assert_eq!(self.id.num, amount_nodes - 1);
+
                     right = Inner { id: &self.id - 1, shape: Leaf, depth: 0 };
                     left = Inner {
                         id: &right.id - 1,
@@ -85,7 +89,28 @@ impl Inner
                         depth,
                     };
                 },
+                Vee => {
+                    let side_amount_nodes = 2 * depth + 1;
+                    let total_amount_nodes = 2 * side_amount_nodes + 1;
+
+                    debug_assert_eq!(self.id.num, total_amount_nodes - 1);
+
+                    right = Inner {
+                        id: &self.id - 1,
+                        shape: if depth >= 1 { List } else { Leaf },
+                        depth,
+                    };
+                    left = Inner {
+                        id: &right.id - side_amount_nodes,
+                        shape: if depth >= 1 { InvertedList } else { Leaf },
+                        depth,
+                    };
+                    debug_assert_eq!(left.id.num, side_amount_nodes - 1);
+                },
                 DegenerateDAG => {
+                    let amount_nodes = self.depth + 1;
+                    debug_assert_eq!(self.id.num, amount_nodes - 1);
+
                     left = Inner {
                         id: &self.id - 1,
                         shape: if depth >= 1 { DegenerateDAG } else { Leaf },
@@ -108,6 +133,69 @@ impl Inner
 
             (left, right)
         })
+    }
+
+    pub fn tail(&self) -> Tail
+    {
+        macro_rules! descend {
+            ($next_vertebrae:expr) => {{
+                let next_vertebrae: &dyn Fn(&Self) -> Option<Self> = &($next_vertebrae);
+                let mut spine = self.clone();
+                while let Some(next) = next_vertebrae(&spine) {
+                    spine = next;
+                }
+                spine
+            }};
+        }
+
+        match self.shape {
+            Shape::Leaf => Tail::Single(self.clone()),
+            Shape::List => Tail::Single(descend!(|i| i.get_edges().map(|(_, n)| n))),
+            Shape::InvertedList => Tail::Single(descend!(|i| i.get_edges().map(|(n, _)| n))),
+            Shape::Vee => {
+                let (left, right) = self.get_edges().expect("not pair");
+                if let (Tail::Single(left), Tail::Single(right)) = (left.tail(), right.tail()) {
+                    Tail::Double(left, right)
+                }
+                else {
+                    unreachable!()
+                }
+            },
+            Shape::DegenerateDAG => Tail::Single(descend!(|i| {
+                i.get_edges().map(|(l, r)| {
+                    debug_assert_eq!(l, r);
+                    l
+                })
+            })),
+            Shape::DegenerateCyclic => Tail::Single(descend!(|i| {
+                i.get_edges().and_then(|(l, r)| {
+                    debug_assert_eq!(l, r);
+                    (i.id.num >= 1).then(|| l)
+                })
+            })),
+        }
+    }
+}
+
+
+#[derive(Debug)]
+pub enum Tail
+{
+    Single(Inner),
+    Double(Inner, Inner),
+}
+
+impl PartialEq<Inner> for Tail
+{
+    fn eq(
+        &self,
+        other: &Inner,
+    ) -> bool
+    {
+        match self {
+            Tail::Single(single) => single == other,
+            Tail::Double(left, right) => left == other && right == other,
+        }
     }
 }
 
@@ -172,7 +260,6 @@ impl Pair for Datum
         let alloc = Rc::clone(&inner.id.alloc);
         let (a, b) = (a.0.into_inner(), b.0.into_inner());
 
-        debug_assert_eq!(inner.id.num, 0);
         debug_assert_eq!(inner.shape, Leaf);
         debug_assert_eq!(inner.depth, 0);
         debug_assert_eq!(alloc, a.id.alloc);
@@ -182,7 +269,6 @@ impl Pair for Datum
             (Leaf, Leaf) => {
                 debug_assert_eq!(a.id.num, 0);
                 debug_assert_eq!(a.depth, 0);
-                debug_assert_eq!(b.id.num, 0);
                 debug_assert_eq!(b.depth, 0);
 
                 if a.id == b.id {
@@ -204,6 +290,15 @@ impl Pair for Datum
                     Inner {
                         id:    Id { alloc, gen: a.id.gen, num: 2 },
                         shape: InvertedList,
+                        depth: 1,
+                    }
+                }
+                else if inner.id.gen == a.id.gen && inner.id.gen == b.id.gen {
+                    let side_amount_nodes = 1;
+                    let total_amount_nodes = 2 * side_amount_nodes + 1;
+                    Inner {
+                        id:    Id { alloc, gen: inner.id.gen, num: total_amount_nodes - 1 },
+                        shape: Vee,
                         depth: 1,
                     }
                 }
@@ -230,6 +325,17 @@ impl Pair for Datum
                     shape: InvertedList,
                     depth: a.depth + 1,
                 }
+            },
+            (InvertedList, List) => {
+                debug_assert_eq!(a.depth, b.depth);
+                debug_assert!(a.id.gen < b.id.gen);
+                debug_assert_eq!(a.id.num, 2 * a.depth);
+                debug_assert_eq!(b.id.num, 2 * b.depth);
+
+                let side_amount_nodes = 2 * a.depth + 1;
+                let total_amount_nodes = 2 * side_amount_nodes + 1;
+                let num = total_amount_nodes - 1; // zero based
+                Inner { id: Id { alloc, gen: a.id.gen, num }, shape: Vee, depth: a.depth + 1 }
             },
             (DegenerateDAG, DegenerateDAG) => {
                 debug_assert_eq!(a, b);
@@ -269,6 +375,46 @@ impl Pair for Datum
         let new = self.inner().clone();
         *self.inner() = Inner { shape: Shape::Leaf, depth: 0, ..new }; // Keep same ID.
         result
+    }
+
+    /// Must only be used by `PairChainMaker::vee`.
+    fn into_vee_tails_for_head(
+        left_tail: Self,
+        right_tail: Self,
+        head: &Self,
+    ) -> (Self, Self)
+    {
+        let head = head.inner();
+        debug_assert_eq!(head.shape, Shape::Vee);
+        debug_assert!(head.depth >= 1);
+        debug_assert!(head.id.num >= 1);
+
+        macro_rules! assert_tail {
+            ($tail:expr) => {{
+                let tail = $tail;
+                debug_assert_eq!(tail.shape, Shape::Leaf);
+                debug_assert_eq!(tail.id.num, 0);
+                debug_assert_eq!(tail.id.alloc, head.id.alloc);
+                debug_assert!(tail.id.num < head.id.num);
+                tail
+            }};
+        }
+
+        if let Shape::Vee = head.shape {
+            let mut left_tail = assert_tail!(left_tail.inner());
+            let mut right_tail = assert_tail!(right_tail.inner());
+            debug_assert!(left_tail.id.gen < right_tail.id.gen);
+
+            let side_depth = head.depth - 1;
+            let side_amount_nodes = 2 * side_depth + 1;
+            right_tail.id = Id { num: side_amount_nodes, ..head.id.clone() };
+            left_tail.id = Id { num: 0, ..head.id.clone() };
+        }
+        else {
+            unreachable!();
+        }
+
+        (left_tail, right_tail)
     }
 
     fn needs_cycle_deep_safe_drop() -> bool
@@ -363,7 +509,70 @@ mod tests
     #[allow(clippy::redundant_clone)]
     mod make
     {
-        use super::*;
+        use {
+            super::*,
+            to_inner::*,
+        };
+
+        mod to_inner
+        {
+            use super::*;
+
+            pub(super) trait ToInner
+            {
+                type Inner;
+                fn to_inner(&self) -> Self::Inner;
+            }
+
+            impl ToInner for Datum
+            {
+                type Inner = Inner;
+
+                fn to_inner(&self) -> Inner
+                {
+                    self.inner().clone()
+                }
+            }
+
+            impl ToInner for (Datum, Datum)
+            {
+                type Inner = InnerPair;
+
+                fn to_inner(&self) -> InnerPair
+                {
+                    InnerPair(self.0.to_inner(), self.1.to_inner())
+                }
+            }
+
+            #[derive(PartialEq, Eq, Debug)]
+            pub(super) struct InnerPair(pub(super) Inner, pub(super) Inner);
+
+            impl PartialEq<InnerPair> for Inner
+            {
+                fn eq(
+                    &self,
+                    other: &InnerPair,
+                ) -> bool
+                {
+                    *self == other.0 && *self == other.1
+                }
+            }
+
+            impl PartialEq<InnerPair> for Tail
+            {
+                fn eq(
+                    &self,
+                    other: &InnerPair,
+                ) -> bool
+                {
+                    match self {
+                        Tail::Single(single) => single == &other.0 && single == &other.1,
+                        Tail::Double(left, right) => left == &other.0 && right == &other.1,
+                    }
+                }
+            }
+        }
+
 
         macro_rules! case_with {
             (
@@ -386,20 +595,18 @@ mod tests
                 let depth = $depth;
                 let same_at_depth = $same_at_depth;
 
-                let (head, tail): (Datum, Datum) =
-                    PairChainMaker::new_with(depth, alloc).$shape();
-                let (head, tail): (Inner, Inner) = (head.inner().clone(), tail.inner().clone());
+                let (head, tail) = PairChainMaker::new_with(depth, alloc).$shape();
+                let (head, tail) = (head.to_inner(), tail.to_inner());
 
                 if depth > same_at_depth {
                     assert_ne!(head, tail);
-                    assert_ne!(head.id, tail.id);
                 }
                 else {
                     assert_eq!(head, tail);
-                    assert_eq!(head.id, tail.id);
                 }
                 assert_eq!(head, $expect_head);
                 assert_eq!(tail, $expect_tail);
+                assert_eq!(head.tail(), tail);
             }};
         }
 
@@ -439,6 +646,12 @@ mod tests
                 Inner { id: id!(3, 0), shape: Leaf, depth: 0 },
                 Inner { id: id!(3, 0), shape: Leaf, depth: 0 }
             );
+            case!(
+                vee,
+                Inner { id: id!(4, 0), shape: Leaf, depth: 0 },
+                InnerPair(Inner { id: id!(4, 0), shape: Leaf, depth: 0 },
+                          Inner { id: id!(4, 0), shape: Leaf, depth: 0 })
+            );
         }
 
         #[test]
@@ -476,6 +689,12 @@ mod tests
                 degenerate_cyclic,
                 Inner { id: id!(8, 0), shape: DegenerateCyclic, depth: 1 },
                 Inner { id: id!(8, 0), shape: DegenerateCyclic, depth: 1 }
+            );
+            case!(
+                vee,
+                Inner { id: id!(9, 2), shape: Vee, depth: 1 },
+                InnerPair(Inner { id: id!(9, 0), shape: Leaf, depth: 0 },
+                          Inner { id: id!(9, 1), shape: Leaf, depth: 0 })
             );
         }
 
@@ -515,6 +734,12 @@ mod tests
                 Inner { id: id!(13, 1), shape: DegenerateCyclic, depth: 2 },
                 Inner { id: id!(13, 0), shape: DegenerateCyclic, depth: 2 }
             );
+            case!(
+                vee,
+                Inner { id: id!(15, 6), shape: Vee, depth: 2 },
+                InnerPair(Inner { id: id!(15, 0), shape: Leaf, depth: 0 },
+                          Inner { id: id!(15, 3), shape: Leaf, depth: 0 })
+            );
         }
 
         #[test]
@@ -553,6 +778,12 @@ mod tests
                 Inner { id: id!(18, 2), shape: DegenerateCyclic, depth: 3 },
                 Inner { id: id!(18, 0), shape: DegenerateCyclic, depth: 3 }
             );
+            case!(
+                vee,
+                Inner { id: id!(21, 10), shape: Vee, depth: 3 },
+                InnerPair(Inner { id: id!(21, 0), shape: Leaf, depth: 0 },
+                          Inner { id: id!(21, 5), shape: Leaf, depth: 0 })
+            );
         }
     }
 
@@ -564,13 +795,12 @@ mod tests
 
         macro_rules! make {
             ($shape:ident, $depth:expr) => {{
-                let (head, _tail): (Datum, Datum) = PairChainMaker::new($depth).$shape();
+                let (head, _tail): (Datum, _) = PairChainMaker::new($depth).$shape();
                 head
             }};
             ($alloc:expr, $shape:ident, $depth:expr) => {{
                 let alloc = Rc::clone(&$alloc);
-                let (head, _tail): (Datum, Datum) =
-                    PairChainMaker::new_with($depth, alloc).$shape();
+                let (head, _tail): (Datum, _) = PairChainMaker::new_with($depth, alloc).$shape();
                 head
             }};
         }
@@ -631,6 +861,18 @@ mod tests
             case!(inverted_list, 2, alloc);
             case!(inverted_list, 3, alloc);
             case!(inverted_list, len(), alloc);
+        }
+
+        #[test]
+        fn vee()
+        {
+            let alloc: Rc<DatumAllocator> = Default::default();
+
+            case!(vee, 0, alloc);
+            case!(vee, 1, alloc);
+            case!(vee, 2, alloc);
+            case!(vee, 3, alloc);
+            case!(vee, len() / 2, alloc);
         }
 
         #[test]
@@ -715,6 +957,14 @@ mod tests
                 {
                     let alloc: Rc<DatumAllocator> = Default::default();
                     case!(inverted_list, sizes::long_list_length(), alloc);
+                }
+
+                #[test]
+                #[ignore]
+                fn vee()
+                {
+                    let alloc: Rc<DatumAllocator> = Default::default();
+                    case!(vee, sizes::long_list_length(), alloc);
                 }
 
                 #[test]

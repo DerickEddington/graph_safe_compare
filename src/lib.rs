@@ -181,8 +181,15 @@ pub trait Node: Sized
     /// the nodes should be considered identical.
     fn id(&self) -> Self::Id;
 
-    /// Get descendent node by index, if `index` is within the range of the `self` node.  The
-    /// algorithm calls this method, until it returns `None`, to descend into each edge.
+    /// Get descendent node by index, if `index` is within the range of the `self` node.  For each
+    /// node, the algorithm calls this method with incrementing indexes starting from "zero",
+    /// until this method returns `None`.
+    ///
+    /// The order in which descendents are given does not have to be fixed and may be varied
+    /// (e.g. based on the position of each node in a shape), but the order must be consistent
+    /// between each pair of nodes that are compared.  This flexibility enables sometimes reducing
+    /// the memory usage required for recursion, for some shapes.  (See also the documentation of
+    /// [`RecurStack`](wide_safe::recursion::stack::RecurStack).)
     #[must_use]
     fn get_edge(
         &self,

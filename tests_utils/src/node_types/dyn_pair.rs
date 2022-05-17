@@ -196,6 +196,7 @@ impl Pair for DatumRef
 }
 
 
+#[derive(Clone)]
 pub struct DatumAllocator
 {
     counter: Cell<usize>,

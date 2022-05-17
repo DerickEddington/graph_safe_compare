@@ -46,6 +46,7 @@ impl Pair for Rc<Datum>
 }
 
 
+#[derive(Clone)]
 pub struct DatumAllocator;
 
 impl Allocator<Rc<Datum>> for DatumAllocator
