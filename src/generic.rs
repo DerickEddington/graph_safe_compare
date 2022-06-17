@@ -297,15 +297,13 @@ mod edges_iter
             CounterpartsResult,
         },
         crate::{
+            utils::NonAdvancingIterator,
             Cmp as _,
             Node,
             Step,
         },
         cfg_if::cfg_if,
-        core::{
-            cmp::Ordering,
-            iter,
-        },
+        core::cmp::Ordering,
     };
 
     /// [`Node::Index`] types must give their "zero" value, for their implementation of
@@ -319,22 +317,47 @@ mod edges_iter
     ///
     /// Enables avoiding consuming excessive space for `RecurMode` types like `RecurStack` and
     /// `RecurQueue`.
-    pub struct EdgesIter<N: Node>(
-        iter::Chain<iter::Once<<Self as Iterator>::Item>, EdgesIterTail<N>>,
-    );
+    pub struct EdgesIter<N: Node>
+    {
+        pub(super) counterparts: Counterparts<N>,
+        next_index:              Option<N::Index>,
+    }
 
     impl<N: Node> EdgesIter<N>
     {
-        pub(super) fn new(
-            first_edges: Counterparts<N>,
-            tail_iter: EdgesIterTail<N>,
-        ) -> Self
+        /// Prepare to get the edges from `counterparts`.
+        pub(super) fn new(counterparts: Counterparts<N>) -> Self
         {
-            debug_assert!({
-                let one = increment_index(&zero());
-                tail_iter.next_index == one
-            });
-            Self(iter::once(Ok(first_edges)).chain(tail_iter))
+            Self { counterparts, next_index: Some(zero()) }
+        }
+
+        fn get_next(
+            &mut self,
+            advance: bool,
+        ) -> Option<<Self as Iterator>::Item>
+        {
+            if let Some(i) = &self.next_index {
+                let [a, b] = &self.counterparts;
+                match [a.get_edge(i), b.get_edge(i)] {
+                    [Some(ae), Some(be)] => {
+                        if advance {
+                            self.next_index = increment_index(i);
+                        }
+                        Some(Ok([ae, be]))
+                    },
+                    [None, None] => {
+                        if advance {
+                            self.next_index = None;
+                        }
+                        None
+                    },
+                    [None, Some(_)] => Some(Err(N::Cmp::from_ord(Ordering::Less))),
+                    [Some(_), None] => Some(Err(N::Cmp::from_ord(Ordering::Greater))),
+                }
+            }
+            else {
+                None
+            }
         }
     }
 
@@ -345,49 +368,15 @@ mod edges_iter
         #[inline]
         fn next(&mut self) -> Option<Self::Item>
         {
-            self.0.next()
+            self.get_next(true)
         }
     }
 
-    pub(super) struct EdgesIterTail<N: Node>
+    impl<N: Node> NonAdvancingIterator for EdgesIter<N>
     {
-        pub(super) counterparts: Counterparts<N>,
-        next_index:              Option<N::Index>,
-    }
-
-    impl<N: Node> EdgesIterTail<N>
-    {
-        /// Prepare to get the edges from `counterparts`.
-        pub(super) fn new(counterparts: Counterparts<N>) -> Self
+        fn next_no_adv(&mut self) -> Option<Self::Item>
         {
-            Self { counterparts, next_index: Some(zero()) }
-        }
-    }
-
-    impl<N: Node> Iterator for EdgesIterTail<N>
-    {
-        type Item = CounterpartsResult<N>;
-
-        fn next(&mut self) -> Option<Self::Item>
-        {
-            if let Some(i) = &self.next_index {
-                let [a, b] = &self.counterparts;
-                match [a.get_edge(i), b.get_edge(i)] {
-                    [Some(ae), Some(be)] => {
-                        self.next_index = increment_index(i);
-                        Some(Ok([ae, be]))
-                    },
-                    [None, None] => {
-                        self.next_index = None;
-                        None
-                    },
-                    [None, Some(_)] => Some(Err(N::Cmp::from_ord(Ordering::Less))),
-                    [Some(_), None] => Some(Err(N::Cmp::from_ord(Ordering::Greater))),
-                }
-            }
-            else {
-                None
-            }
+            self.get_next(false)
         }
     }
 
@@ -408,14 +397,6 @@ mod edges_iter
 /// The central parts of the algorithm.
 pub mod equiv
 {
-    use {
-        super::edges_iter::EdgesIterTail,
-        crate::{
-            Cmp,
-            Node,
-        },
-    };
-
     pub use super::{
         edges_iter::EdgesIter,
         modes::DescendMode,
@@ -424,6 +405,11 @@ pub mod equiv
             CounterpartsResult,
             RecurMode,
         },
+    };
+    use crate::{
+        utils::NonAdvancingIterator as _,
+        Cmp,
+        Node,
     };
 
     /// Generic parameters of [`Equiv`] and its operations.
@@ -584,13 +570,12 @@ pub mod equiv
             if try_into!(self.descend_mode.do_traverse()) && a.id() != b.id() {
                 cmp = a.equiv_modulo_edges(&b);
                 if cmp.is_equiv() {
-                    let mut edges_iter = EdgesIterTail::new([a, b]);
-                    match edges_iter.next() {
-                        Some(Ok(first)) => {
+                    let mut edges_iter = EdgesIter::new([a, b]);
+                    match edges_iter.next_no_adv() {
+                        Some(Ok(_)) => {
                             #[allow(clippy::shadow_unrelated)]
                             let [a, b] = &edges_iter.counterparts;
                             if try_into!(self.descend_mode.do_edges(a, b)) {
-                                let edges_iter = EdgesIter::new(first, edges_iter);
                                 cmp = try_into!(P::RecurMode::recur(self, edges_iter));
                             }
                         },

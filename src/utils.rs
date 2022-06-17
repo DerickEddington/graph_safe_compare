@@ -4,6 +4,7 @@ pub(crate) use lazy_collections::{
     LazyVecQueue,
     LazyVecStack,
 };
+pub(crate) use non_advancing_iterator::NonAdvancingIterator;
 pub use ref_id::RefId;
 
 
@@ -139,36 +140,36 @@ mod lazy_collections
 {
     extern crate alloc;
     use {
+        super::NonAdvancingIterator,
         alloc::{
             collections::VecDeque,
             vec::Vec,
         },
-        core::iter::Peekable,
     };
 
     /// A logical stack of items yielded by an internal stack of [`Iterator`]s.  Enables lazily
     /// generating items to reduce memory usage.
-    pub(crate) struct LazyVecStack<I: Iterator>(Vec<Peekable<I>>);
+    pub(crate) struct LazyVecStack<I>(Vec<I>);
 
     /// A logical queue of items yielded by an internal queue of [`Iterator`]s.  Enables lazily
     /// generating items to reduce memory usage.
-    pub(crate) struct LazyVecQueue<I: Iterator>(VecDeque<Peekable<I>>);
+    pub(crate) struct LazyVecQueue<I>(VecDeque<I>);
 
     /// Somewhat similar to [`Flatten`](core::iter::Flatten) but designed to not consume ownership
     /// and not hold a "current" sub-iterator so that mutating to `extend` with further items may
     /// be done between `next` calls.
     pub(crate) trait LazierIterator
     {
-        type SubIter: Iterator;
+        type SubIter: NonAdvancingIterator;
 
         fn extend(
             &mut self,
             subiter: Self::SubIter,
         );
 
-        fn next_subiter_as_mut(&mut self) -> Option<&mut Peekable<Self::SubIter>>;
+        fn next_subiter_as_mut(&mut self) -> Option<&mut Self::SubIter>;
 
-        fn next_subiter(&mut self) -> Option<Peekable<Self::SubIter>>;
+        fn next_subiter(&mut self) -> Option<Self::SubIter>;
 
         #[allow(clippy::inline_always)]
         #[inline(always)] // Actually makes a big difference.
@@ -176,7 +177,7 @@ mod lazy_collections
         {
             while let Some(subiter) = self.next_subiter_as_mut() {
                 let next = subiter.next();
-                if subiter.peek().is_none() {
+                if !subiter.has_next() {
                     drop(self.next_subiter()); // Remove empty iterators, before returning `Some`.
                 }
                 if next.is_some() {
@@ -197,7 +198,7 @@ mod lazy_collections
             },)*
         } => {
             $(
-                impl<I: Iterator> $t
+                impl<I> $t
                 {
                     pub(crate) fn with_capacity(capacity: usize) -> Self
                     {
@@ -210,7 +211,7 @@ mod lazy_collections
                     }
                 }
 
-                impl<I: Iterator> LazierIterator for $t
+                impl<I: NonAdvancingIterator> LazierIterator for $t
                 {
                     type SubIter = I;
 
@@ -219,15 +220,15 @@ mod lazy_collections
                         subiter: Self::SubIter,
                     )
                     {
-                        self.0.$extend(subiter.peekable());
+                        self.0.$extend(subiter);
                     }
 
-                    fn next_subiter_as_mut(&mut self) -> Option<&mut Peekable<Self::SubIter>>
+                    fn next_subiter_as_mut(&mut self) -> Option<&mut Self::SubIter>
                     {
                         self.0.$next_subiter_as_mut()
                     }
 
-                    fn next_subiter(&mut self) -> Option<Peekable<Self::SubIter>>
+                    fn next_subiter(&mut self) -> Option<Self::SubIter>
                     {
                         self.0.$next_subiter()
                     }
@@ -239,5 +240,29 @@ mod lazy_collections
     provided_impls! {
         LazyVecStack<I> { Vec::with_capacity, push, last_mut, pop },
         LazyVecQueue<I> { VecDeque::with_capacity, push_back, front_mut, pop_front },
+    }
+}
+
+
+mod non_advancing_iterator
+{
+    /// An `Iterator` that can repeatedly yield the same next item without advancing.
+    ///
+    /// Unlike [`Peekable`](core::iter::Peekable), this is not required to store and repeatedly
+    /// yield the same value.  The logically-same next item may be dynamically regenerated as
+    /// distinct equivalent values.
+    pub(crate) trait NonAdvancingIterator: Iterator
+    {
+        /// Returns the next item without advancing the iterator.
+        ///
+        /// Multiple calls return the logically-same item, when the iterator is not advanced by
+        /// some other means.  In such case, this may or may not be the same value.
+        fn next_no_adv(&mut self) -> Option<Self::Item>;
+
+        /// Returns `true` if the iterator has a next item, without advancing the iterator.
+        fn has_next(&mut self) -> bool
+        {
+            self.next_no_adv().is_some()
+        }
     }
 }

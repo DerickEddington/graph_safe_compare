@@ -182,8 +182,8 @@ pub trait Node: Sized
     fn id(&self) -> Self::Id;
 
     /// Get descendent node by index, if `index` is within the range of the `self` node.  For each
-    /// node, the algorithm calls this method with incrementing indexes starting from "zero",
-    /// until this method returns `None`.
+    /// node, the algorithm calls this method with incrementing indexes starting from "zero", up
+    /// to twice for each index, until this method returns `None`.
     ///
     /// The order in which descendents are given does not have to be fixed and may be varied
     /// (e.g. based on the position of each node in a shape), but the order must be consistent
