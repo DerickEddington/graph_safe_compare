@@ -81,3 +81,6 @@ required-features = ["std"]
 inherits = "bench"
 lto = true
 codegen-units = 1
+
+[package.metadata.docs.rs]
+features = ["std", "fastrand", "oorandom", "wyrng"]
