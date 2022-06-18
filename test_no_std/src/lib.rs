@@ -82,6 +82,11 @@ mod for_dylib_and_bin
             abort();
         }
     }
+
+    // Provide this symbol, without using the unstable nightly-only `eh_personality` "lang item".
+    // Needed with Rust 1.60+, and works with previous versions.
+    #[no_mangle]
+    extern "C" fn rust_eh_personality() {}
 }
 
 
