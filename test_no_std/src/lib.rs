@@ -103,6 +103,7 @@ macro_rules! static_assert_dep_is_std {
                     equiv,
                     precheck_equiv,
                 },
+                deep_safe,
                 generic::equiv_classes::premade::{
                     hash_map::Table,
                     rc::Rc,
