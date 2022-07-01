@@ -59,7 +59,10 @@
     clippy::separated_literal_suffix,
     clippy::single_char_lifetime_names,
     clippy::missing_docs_in_private_items,
+    clippy::mod_module_files,
+    clippy::self_named_module_files,
     clippy::pattern_type_mismatch,
+    clippy::pub_use,
     clippy::shadow_reuse
 )]
 // When our package-feature "anticipate" is activated, cause breaking changes to our API that use
