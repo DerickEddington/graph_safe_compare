@@ -170,7 +170,7 @@ impl Inner
             Shape::DegenerateCyclic => Tail::Single(descend!(|i| {
                 i.get_edges().and_then(|(l, r)| {
                     debug_assert_eq!(l, r);
-                    (i.id.num >= 1).then(|| l)
+                    (i.id.num >= 1).then_some(l)
                 })
             })),
         }

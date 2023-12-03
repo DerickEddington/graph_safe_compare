@@ -35,6 +35,7 @@ mod custom_rc
     {
         type Target = Cell<Class<Self>>;
 
+        #[allow(clippy::explicit_auto_deref)]
         fn deref(&self) -> &Self::Target
         {
             &*self.0
@@ -43,6 +44,7 @@ mod custom_rc
 
     impl equiv_classes::Rc for Rc
     {
+        #[allow(clippy::arc_with_non_send_sync)] // `Arc` is intentional for testing.
         fn new(val: Cell<Class<Self>>) -> Self
         {
             Self(Arc::new(val))

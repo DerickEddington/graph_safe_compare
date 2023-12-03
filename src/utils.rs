@@ -37,6 +37,7 @@ mod ref_id
 
     impl<T: Deref> RefId<T>
     {
+        #[allow(clippy::explicit_auto_deref)]
         #[inline]
         fn as_ptr(&self) -> *const T::Target
         {

@@ -61,7 +61,7 @@ impl DatumAllocator
 {
     pub fn new(_size: u32) -> Self
     {
-        Self::default()
+        Self
     }
 }
 

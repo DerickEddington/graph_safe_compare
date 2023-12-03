@@ -132,10 +132,13 @@ impl<R: Rc> Class<R>
         other: &R,
     ) -> bool
     {
-        debug_assert!(matches!(
-            (Self::clone_inner(it), Self::clone_inner(other)),
-            (Self::Representative { .. }, Self::Representative { .. })
-        ));
+        debug_assert!(
+            matches!(
+                (Self::clone_inner(it), Self::clone_inner(other)),
+                (Self::Representative { .. }, Self::Representative { .. })
+            ),
+            "only `Representative`s can be meaningfully compared by pointer equality"
+        );
 
         ptr::eq(&**it, &**other)
     }
@@ -347,6 +350,7 @@ pub mod premade
             {
                 type Target = Cell<Class<Self>>;
 
+                #[allow(clippy::explicit_auto_deref)]
                 #[inline]
                 fn deref(&self) -> &Self::Target
                 {

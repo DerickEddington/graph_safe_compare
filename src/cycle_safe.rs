@@ -222,7 +222,8 @@ pub mod modes
                 else if self.ticker < Self::SLOW_LIMIT_NEG {
                     debug_assert_eq!(
                         (self.ticker, false),
-                        Self::SLOW_LIMIT_NEG.overflowing_sub(1)
+                        Self::SLOW_LIMIT_NEG.overflowing_sub(1),
+                        "overflow is supposed to be impossible here"
                     );
                     // Random limits for "fast" "reduce the likelihood of repeatedly tripping on
                     // worst-case behavior in cases where the sizes of the input graphs happen to

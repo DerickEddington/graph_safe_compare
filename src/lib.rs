@@ -53,16 +53,23 @@
 #![cfg_attr(not(test), warn(unused_crate_dependencies))]
 // Exclude (re-allow) undesired lints included in above groups.
 #![allow(
+    clippy::absolute_paths,
     clippy::implicit_return,
     clippy::blanket_clippy_restriction_lints,
     clippy::default_numeric_fallback,
     clippy::separated_literal_suffix,
     clippy::single_char_lifetime_names,
+    clippy::min_ident_chars,
     clippy::missing_docs_in_private_items,
+    clippy::missing_trait_methods,
     clippy::mod_module_files,
     clippy::self_named_module_files,
+    clippy::single_call_fn,
     clippy::pattern_type_mismatch,
     clippy::pub_use,
+    clippy::pub_with_shorthand,
+    clippy::question_mark_used,
+    clippy::semicolon_outside_block,
     clippy::shadow_reuse
 )]
 // When our package-feature "anticipate" is activated, cause breaking changes to our API that use

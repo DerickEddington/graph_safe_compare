@@ -428,6 +428,7 @@ pub mod equiv
 
     /// The state for an invocation of a variation of the algorithm.
     #[non_exhaustive]
+    #[allow(clippy::partial_pub_fields)]
     pub struct Equiv<P: Params>
     {
         /// Controls if node edges are descended into.

@@ -271,8 +271,9 @@ pub mod modes
             #[inline]
             fn do_traverse(&mut self) -> Result<bool, Self::Error>
             {
+                #[allow(clippy::arithmetic_side_effects)]
                 if self.0 > 0.into() {
-                    self.0 -= 1.into();
+                    self.0 -= 1.into(); // Overflow impossible, by conditional.
                     Ok(true)
                 }
                 else {

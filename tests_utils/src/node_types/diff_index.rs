@@ -52,26 +52,20 @@ impl PartialEq for Datum
 }
 impl Eq for Datum {}
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Default, PartialEq, Eq, Debug)]
 pub enum Inner
 {
+    #[default]
     Leaf,
     Pair(Datum, Datum),
 }
 
-impl Default for Inner
-{
-    fn default() -> Self
-    {
-        Inner::Leaf
-    }
-}
-
 type Region = Rc<[RefCell<Inner>]>;
 
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub enum Index
 {
+    #[default]
     Zero,
     One,
     Two,
@@ -80,14 +74,6 @@ pub enum Index
     Five,
     Six,
     Seven,
-}
-
-impl Default for Index
-{
-    fn default() -> Self
-    {
-        Self::Zero
-    }
 }
 
 impl Index
